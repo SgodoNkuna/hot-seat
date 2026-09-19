@@ -4,7 +4,7 @@
 
 A retro game-show-styled party word game: teams race the clock to guess 5 words off a card before the buzzer. Play pass-and-play on one phone, or live online across devices.
 
-**[▶ Play it now](https://SgodoNkuna.github.io/hot-seat/)** — works in any browser, no install needed. (Local play works immediately; online play needs the server from the [Deploy](#online-play--server) section running somewhere.)
+**[▶ Play it now](https://sgodonkuna.github.io/hot-seat/)** — works in any browser, no install needed. (Local play works immediately; online play needs the server from the [Deploy](#online-play--server) section running somewhere.)
 
 ## Features
 
