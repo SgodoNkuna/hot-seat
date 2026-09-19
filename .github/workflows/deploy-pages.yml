@@ -1,0 +1,52 @@
+name: Deploy web build to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx expo export --platform web
+
+      # GitHub Pages project sites serve from /<repo>/, but Expo's web export
+      # hardcodes root-absolute paths ("/_expo/...", "/favicon.ico"). Rewrite
+      # them to relative so the build works from any subpath.
+      - name: Rewrite absolute asset paths to relative
+        run: |
+          sed -i 's#"/_expo/#"./_expo/#g; s#href="/favicon.ico"#href="./favicon.ico"#g' dist/index.html
+          find dist/_expo -name '*.js' -exec sed -i 's#"/assets/#"./assets/#g' {} +
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
