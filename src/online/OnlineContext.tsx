@@ -20,6 +20,7 @@ interface OnlineContextValue {
   correct: () => void;
   skip: () => void;
   flip: () => void;
+  nextCard: () => void;
   endTurn: () => void;
   leaveAndDisconnect: () => void;
   clearError: () => void;
@@ -98,6 +99,7 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
   const correct = useCallback(() => send({ type: 'correct' }), [send]);
   const skip = useCallback(() => send({ type: 'skip' }), [send]);
   const flip = useCallback(() => send({ type: 'flip' }), [send]);
+  const nextCard = useCallback(() => send({ type: 'next_card' }), [send]);
   const endTurn = useCallback(() => send({ type: 'end_turn' }), [send]);
 
   const leaveAndDisconnect = useCallback(() => {
@@ -130,6 +132,7 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
         correct,
         skip,
         flip,
+        nextCard,
         endTurn,
         leaveAndDisconnect,
         clearError,

@@ -10,7 +10,7 @@ import { colors, fonts } from '../theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlinePlay'>;
 
 export default function OnlinePlayScreen({ navigation }: Props) {
-  const { gameState, room, playerId, startTurn, correct, skip, flip, endTurn } = useOnline();
+  const { gameState, room, playerId, startTurn, correct, skip, flip, nextCard, endTurn } = useOnline();
   const buzzerRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
@@ -47,6 +47,8 @@ export default function OnlinePlayScreen({ navigation }: Props) {
   const myTeam = room.teams.find((t) => t.players.some((p) => p.id === playerId));
   const isMyTurn = myTeam?.id === currentTeam.id;
   const cardWords = gameState.currentCard ?? [];
+  const sideComplete = gameState.isTurnActive && gameState.currentCard !== null && gameState.pendingIndices.length === 0;
+  const canFlip = sideComplete && gameState.config.allowFlip && !!gameState.currentCardOtherSide;
 
   if (!gameState.isTurnActive && !gameState.currentCard) {
     return (
@@ -101,36 +103,47 @@ export default function OnlinePlayScreen({ navigation }: Props) {
             {gameState.cardSide === 'blue' ? 'BLUE SIDE' : 'YELLOW SIDE'}
           </Text>
         )}
-        {cardWords.map((word, i) => (
-          <Text key={i} style={styles.wordText}>
-            {word}
-          </Text>
-        ))}
+        {cardWords.map((word, i) => {
+          const done = gameState.completedIndices.includes(i);
+          const active = !done && gameState.pendingIndices[0] === i;
+          return (
+            <Text key={i} style={[styles.wordText, done && styles.wordTextDone, active && styles.wordTextActive]}>
+              {word}
+            </Text>
+          );
+        })}
       </View>
-
-      {isMyTurn && gameState.config.allowFlip && gameState.currentCardOtherSide && (
-        <Pressable
-          style={[styles.flipButton, gameState.cardSide === 'blue' ? styles.flipButtonToYellow : styles.flipButtonToBlue]}
-          onPress={flip}
-        >
-          <Text style={styles.flipButtonText}>
-            FLIP TO {gameState.cardSide === 'blue' ? 'YELLOW' : 'BLUE'}
-          </Text>
-        </Pressable>
-      )}
 
       {isMyTurn ? (
         <>
-          <View style={styles.actionRow}>
-            {gameState.config.allowSkip && (
-              <Pressable style={[styles.actionButton, styles.skipButton]} onPress={skip}>
-                <Text style={styles.actionButtonText}>SKIP</Text>
+          {sideComplete ? (
+            <View style={styles.sideCompleteRow}>
+              {canFlip && (
+                <Pressable
+                  style={[styles.actionButton, gameState.cardSide === 'blue' ? styles.flipButtonToYellow : styles.flipButtonToBlue]}
+                  onPress={flip}
+                >
+                  <Text style={styles.actionButtonTextDark}>
+                    FLIP TO {gameState.cardSide === 'blue' ? 'YELLOW' : 'BLUE'}
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable style={[styles.actionButton, styles.correctButton]} onPress={nextCard}>
+                <Text style={styles.actionButtonTextDark}>NEXT CARD</Text>
               </Pressable>
-            )}
-            <Pressable style={[styles.actionButton, styles.correctButton]} onPress={correct}>
-              <Text style={styles.actionButtonTextDark}>RIGHT!</Text>
-            </Pressable>
-          </View>
+            </View>
+          ) : (
+            <View style={styles.actionRow}>
+              {gameState.config.allowSkip && (
+                <Pressable style={[styles.actionButton, styles.skipButton]} onPress={skip}>
+                  <Text style={styles.actionButtonText}>SKIP</Text>
+                </Pressable>
+              )}
+              <Pressable style={[styles.actionButton, styles.correctButton]} onPress={correct}>
+                <Text style={styles.actionButtonTextDark}>RIGHT!</Text>
+              </Pressable>
+            </View>
+          )}
           <Pressable style={styles.endEarlyLink} onPress={endTurn}>
             <Text style={styles.endEarlyText}>End turn early</Text>
           </Pressable>
@@ -161,10 +174,11 @@ const styles = StyleSheet.create({
   sideLabelBlue: { color: colors.blue },
   sideLabelYellow: { color: colors.yellowDark },
   wordText: { fontFamily: fonts.bodySemiBold, fontSize: 22, color: colors.ink, marginVertical: 6 },
-  flipButton: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 999, alignSelf: 'center' },
-  flipButtonToYellow: { backgroundColor: colors.yellow, borderBottomWidth: 4, borderBottomColor: colors.yellowDark },
-  flipButtonToBlue: { backgroundColor: colors.blue, borderBottomWidth: 4, borderBottomColor: colors.blueDark },
-  flipButtonText: { fontFamily: fonts.display, fontSize: 12, letterSpacing: 1, color: colors.cream },
+  wordTextDone: { color: colors.inkFaint, textDecorationLine: 'line-through' },
+  wordTextActive: { color: colors.red },
+  flipButtonToYellow: { backgroundColor: colors.yellow, borderBottomWidth: 6, borderBottomColor: colors.yellowDark },
+  flipButtonToBlue: { backgroundColor: colors.blue, borderBottomWidth: 6, borderBottomColor: colors.blueDark },
+  sideCompleteRow: { flexDirection: 'row', gap: 16, marginTop: 30, width: '100%' },
   actionRow: { flexDirection: 'row', gap: 16, marginTop: 30, width: '100%' },
   actionButton: { flex: 1, paddingVertical: 20, borderRadius: 999, alignItems: 'center' },
   skipButton: { backgroundColor: '#5A3A26', borderBottomWidth: 5, borderBottomColor: '#24140D' },

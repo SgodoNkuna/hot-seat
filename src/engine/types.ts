@@ -41,9 +41,12 @@ export interface GameState {
   deck: CardPair[]; // shuffled remaining card pairs
   discard: CardPair[];
   currentTeamIndex: number;
-  currentCard: string[] | null;
+  activePair: CardPair | null; // the pair currently drawn, kept for discard bookkeeping
+  currentCard: string[] | null; // active side's words, fixed display order
   cardSide: CardSide;
-  currentCardOtherSide: string[] | null; // words for the inactive side, if flip is available for this card
+  currentCardOtherSide: string[] | null; // other side's words, available to flip to once, until used
+  pendingIndices: number[]; // indices into currentCard still to be guessed, in attempt order
+  completedIndices: number[]; // indices into currentCard already guessed correctly
   guessedThisTurn: number;
   skippedThisTurn: number;
   timeRemaining: number;

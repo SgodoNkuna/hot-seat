@@ -64,6 +64,9 @@ wss.on('connection', (ws: WebSocket) => {
       case 'flip':
         if (conn.playerId) rooms.flip(conn.playerId);
         break;
+      case 'next_card':
+        if (conn.playerId) rooms.nextCard(conn.playerId);
+        break;
       case 'end_turn':
         if (conn.playerId) rooms.endTurnEarly(conn.playerId);
         break;

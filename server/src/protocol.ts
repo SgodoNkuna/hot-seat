@@ -26,6 +26,7 @@ export type ClientMessage =
   | { type: 'correct' }
   | { type: 'skip' }
   | { type: 'flip' }
+  | { type: 'next_card' }
   | { type: 'end_turn' }
   | { type: 'leave' };
 

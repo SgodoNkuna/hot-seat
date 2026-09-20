@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import { Deck, GameConfig, GameState, Team } from './shared/types';
-import { createGame, startTurn, tick, markCorrect, markSkip, flipCard, endTurn } from './shared/GameEngine';
+import { createGame, startTurn, tick, markCorrect, markSkip, flipCard, nextCard, endTurn } from './shared/GameEngine';
 import { DECKS } from './shared/decks';
 import { RoomSnapshot, RoomTeam, ServerMessage } from './protocol';
 
@@ -151,6 +151,13 @@ export class RoomManager {
     const room = this.getRoomByPlayer(playerId);
     if (!room?.gameState) return;
     room.gameState = flipCard(room.gameState);
+    this.broadcastGame(room);
+  }
+
+  nextCard(playerId: string) {
+    const room = this.getRoomByPlayer(playerId);
+    if (!room?.gameState) return;
+    room.gameState = nextCard(room.gameState);
     this.broadcastGame(room);
   }
 

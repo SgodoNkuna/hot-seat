@@ -18,9 +18,12 @@ export function createGame(teams: Team[], config: GameConfig, allDecks: Deck[]):
     deck: shuffle(pairs),
     discard: [],
     currentTeamIndex: 0,
+    activePair: null,
     currentCard: null,
     cardSide: 'blue',
     currentCardOtherSide: null,
+    pendingIndices: [],
+    completedIndices: [],
     guessedThisTurn: 0,
     skippedThisTurn: 0,
     timeRemaining: config.turnSeconds,
@@ -34,20 +37,26 @@ export function createGame(teams: Team[], config: GameConfig, allDecks: Deck[]):
   };
 }
 
-function drawCard(state: GameState): GameState {
+/** Draws a fresh card pair from the deck (reshuffling the discard pile if needed). */
+function drawCard(state: GameState, discard: CardPair[] = state.discard): GameState {
   let deck = state.deck;
-  let discard = state.discard;
+  let pool = discard;
   if (deck.length === 0) {
-    deck = shuffle(discard);
-    discard = [];
+    deck = shuffle(pool);
+    pool = [];
   }
   const [pair, ...rest] = deck;
+  const blue = pair?.blue ?? null;
   return {
     ...state,
     deck: rest,
-    currentCard: pair?.blue ?? null,
+    discard: pool,
+    activePair: pair ?? null,
+    currentCard: blue,
     cardSide: 'blue',
     currentCardOtherSide: state.config.allowFlip ? pair?.yellow ?? null : null,
+    pendingIndices: blue ? blue.map((_, i) => i) : [],
+    completedIndices: [],
   };
 }
 
@@ -71,43 +80,64 @@ export function tick(state: GameState): GameState {
   return { ...state, timeRemaining: next };
 }
 
-/** Flips the current card between its blue and yellow side (view-only, no scoring effect). */
-export function flipCard(state: GameState): GameState {
-  if (!state.config.allowFlip || !state.isTurnActive || !state.currentCard || !state.currentCardOtherSide) {
-    return state;
-  }
-  return {
-    ...state,
-    currentCard: state.currentCardOtherSide,
-    currentCardOtherSide: state.currentCard,
-    cardSide: state.cardSide === 'blue' ? 'yellow' : 'blue',
-  };
-}
-
-function currentPair(state: GameState): CardPair | null {
-  if (!state.currentCard) return null;
-  return state.cardSide === 'blue'
-    ? { blue: state.currentCard, yellow: state.currentCardOtherSide }
-    : { blue: state.currentCardOtherSide ?? state.currentCard, yellow: state.currentCard };
-}
-
+/** Marks the current active word correct. Only advances to a new card once every word on this side is done and no flip is available. */
 export function markCorrect(state: GameState): GameState {
-  if (!state.isTurnActive || !state.currentCard) return state;
+  if (!state.isTurnActive || !state.currentCard || state.pendingIndices.length === 0) return state;
+  const [idx, ...restPending] = state.pendingIndices;
   const teams = state.teams.map((t, i) =>
     i === state.currentTeamIndex ? { ...t, score: t.score + 1 } : t
   );
-  const pair = currentPair(state);
-  const discard = pair ? [...state.discard, pair] : state.discard;
-  const withCard = drawCard({ ...state, teams, discard, deck: state.deck });
-  return { ...withCard, guessedThisTurn: state.guessedThisTurn + 1 };
+  const completedIndices = [...state.completedIndices, idx];
+  const base = { ...state, teams, completedIndices, guessedThisTurn: state.guessedThisTurn + 1 };
+
+  if (restPending.length > 0) {
+    return { ...base, pendingIndices: restPending };
+  }
+
+  // side complete
+  if (state.config.allowFlip && state.currentCardOtherSide) {
+    // wait for an explicit flip or "next card" action
+    return { ...base, pendingIndices: [] };
+  }
+  const discard = state.activePair ? [...state.discard, state.activePair] : state.discard;
+  return drawCard(base, discard);
 }
 
+/** Skips the current active word — it moves to the back of this side's queue, not discarded. */
 export function markSkip(state: GameState): GameState {
-  if (!state.isTurnActive || !state.currentCard || !state.config.allowSkip) return state;
-  const pair = currentPair(state);
-  const discard = pair ? [...state.discard, pair] : state.discard;
-  const withCard = drawCard({ ...state, discard });
-  return { ...withCard, skippedThisTurn: state.skippedThisTurn + 1 };
+  if (!state.isTurnActive || !state.currentCard || !state.config.allowSkip || state.pendingIndices.length === 0) {
+    return state;
+  }
+  const [first, ...rest] = state.pendingIndices;
+  return { ...state, pendingIndices: [...rest, first], skippedThisTurn: state.skippedThisTurn + 1 };
+}
+
+/** Flips to the other side, only once the current side's words are all guessed. Usable once per card. */
+export function flipCard(state: GameState): GameState {
+  if (
+    !state.isTurnActive ||
+    !state.config.allowFlip ||
+    state.pendingIndices.length !== 0 ||
+    !state.currentCardOtherSide
+  ) {
+    return state;
+  }
+  const words = state.currentCardOtherSide;
+  return {
+    ...state,
+    currentCard: words,
+    currentCardOtherSide: null,
+    cardSide: state.cardSide === 'blue' ? 'yellow' : 'blue',
+    pendingIndices: words.map((_, i) => i),
+    completedIndices: [],
+  };
+}
+
+/** Declines the flip (or there's nothing left to flip to) and draws a brand new card. Only usable once the current side is fully done. */
+export function nextCard(state: GameState): GameState {
+  if (!state.isTurnActive || state.pendingIndices.length !== 0) return state;
+  const discard = state.activePair ? [...state.discard, state.activePair] : state.discard;
+  return drawCard(state, discard);
 }
 
 function activeTeams(state: GameState): Team[] {
@@ -156,12 +186,17 @@ function highestScoreWinner(state: GameState): Team | undefined {
 }
 
 export function endTurn(state: GameState): GameState {
+  const discard = state.activePair ? [...state.discard, state.activePair] : state.discard;
   let next: GameState = {
     ...state,
     isTurnActive: false,
+    activePair: null,
     currentCard: null,
     cardSide: 'blue',
     currentCardOtherSide: null,
+    pendingIndices: [],
+    completedIndices: [],
+    discard,
   };
 
   if (next.config.mode === 'elimination') {

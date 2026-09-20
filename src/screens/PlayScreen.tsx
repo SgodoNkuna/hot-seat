@@ -4,7 +4,7 @@ import { Audio } from 'expo-av';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../state/GameContext';
-import { startTurn, tick, markCorrect, markSkip, endTurn, flipCard, getCurrentTeam } from '../engine/GameEngine';
+import { startTurn, tick, markCorrect, markSkip, endTurn, flipCard, nextCard, getCurrentTeam } from '../engine/GameEngine';
 import CountdownRing from '../components/CountdownRing';
 import { colors, fonts } from '../theme';
 
@@ -70,6 +70,8 @@ export default function PlayScreen({ navigation }: Props) {
 
   const currentTeam = getCurrentTeam(state);
   const cardWords = state.currentCard ?? [];
+  const sideComplete = state.isTurnActive && state.currentCard !== null && state.pendingIndices.length === 0;
+  const canFlip = sideComplete && state.config.allowFlip && !!state.currentCardOtherSide;
 
   if (showTurnCard) {
     return (
@@ -139,40 +141,54 @@ export default function PlayScreen({ navigation }: Props) {
             {state.cardSide === 'blue' ? 'BLUE SIDE' : 'YELLOW SIDE'}
           </Text>
         )}
-        {cardWords.map((word, i) => (
-          <Text key={i} style={styles.wordText}>
-            {word}
-          </Text>
-        ))}
+        {cardWords.map((word, i) => {
+          const done = state.completedIndices.includes(i);
+          const active = !done && state.pendingIndices[0] === i;
+          return (
+            <Text key={i} style={[styles.wordText, done && styles.wordTextDone, active && styles.wordTextActive]}>
+              {word}
+            </Text>
+          );
+        })}
       </View>
 
-      {state.config.allowFlip && state.currentCardOtherSide && (
-        <Pressable
-          style={[styles.flipButton, state.cardSide === 'blue' ? styles.flipButtonToYellow : styles.flipButtonToBlue]}
-          onPress={() => update((s) => flipCard(s))}
-        >
-          <Text style={styles.flipButtonText}>
-            FLIP TO {state.cardSide === 'blue' ? 'YELLOW' : 'BLUE'}
-          </Text>
-        </Pressable>
-      )}
-
-      <View style={styles.actionRow}>
-        {state.config.allowSkip && (
+      {sideComplete ? (
+        <View style={styles.sideCompleteRow}>
+          {canFlip && (
+            <Pressable
+              style={[styles.actionButton, state.cardSide === 'blue' ? styles.flipButtonToYellow : styles.flipButtonToBlue]}
+              onPress={() => update((s) => flipCard(s))}
+            >
+              <Text style={styles.actionButtonTextDark}>
+                FLIP TO {state.cardSide === 'blue' ? 'YELLOW' : 'BLUE'}
+              </Text>
+            </Pressable>
+          )}
           <Pressable
-            style={[styles.actionButton, styles.skipButton]}
-            onPress={() => update((s) => markSkip(s))}
+            style={[styles.actionButton, styles.correctButton]}
+            onPress={() => update((s) => nextCard(s))}
           >
-            <Text style={styles.actionButtonText}>SKIP</Text>
+            <Text style={styles.actionButtonTextDark}>NEXT CARD</Text>
           </Pressable>
-        )}
-        <Pressable
-          style={[styles.actionButton, styles.correctButton]}
-          onPress={() => update((s) => markCorrect(s))}
-        >
-          <Text style={styles.actionButtonTextDark}>RIGHT!</Text>
-        </Pressable>
-      </View>
+        </View>
+      ) : (
+        <View style={styles.actionRow}>
+          {state.config.allowSkip && (
+            <Pressable
+              style={[styles.actionButton, styles.skipButton]}
+              onPress={() => update((s) => markSkip(s))}
+            >
+              <Text style={styles.actionButtonText}>SKIP</Text>
+            </Pressable>
+          )}
+          <Pressable
+            style={[styles.actionButton, styles.correctButton]}
+            onPress={() => update((s) => markCorrect(s))}
+          >
+            <Text style={styles.actionButtonTextDark}>RIGHT!</Text>
+          </Pressable>
+        </View>
+      )}
 
       <Pressable style={styles.endEarlyLink} onPress={handleEndTurnEarly}>
         <Text style={styles.endEarlyText}>End turn early</Text>
@@ -200,10 +216,11 @@ const styles = StyleSheet.create({
   sideLabelBlue: { color: colors.blue },
   sideLabelYellow: { color: colors.yellowDark },
   wordText: { fontFamily: fonts.bodySemiBold, fontSize: 22, color: colors.ink, marginVertical: 6 },
-  flipButton: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 999, alignSelf: 'center' },
-  flipButtonToYellow: { backgroundColor: colors.yellow, borderBottomWidth: 4, borderBottomColor: colors.yellowDark },
-  flipButtonToBlue: { backgroundColor: colors.blue, borderBottomWidth: 4, borderBottomColor: colors.blueDark },
-  flipButtonText: { fontFamily: fonts.display, fontSize: 12, letterSpacing: 1, color: colors.cream },
+  wordTextDone: { color: colors.inkFaint, textDecorationLine: 'line-through' },
+  wordTextActive: { color: colors.red },
+  flipButtonToYellow: { backgroundColor: colors.yellow, borderBottomWidth: 6, borderBottomColor: colors.yellowDark },
+  flipButtonToBlue: { backgroundColor: colors.blue, borderBottomWidth: 6, borderBottomColor: colors.blueDark },
+  sideCompleteRow: { flexDirection: 'row', gap: 16, marginTop: 30, width: '100%' },
   actionRow: { flexDirection: 'row', gap: 16, marginTop: 30, width: '100%' },
   actionButton: { flex: 1, paddingVertical: 20, borderRadius: 999, alignItems: 'center' },
   skipButton: { backgroundColor: '#5A3A26', borderBottomWidth: 5, borderBottomColor: '#24140D' },
