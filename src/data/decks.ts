@@ -1,6 +1,7 @@
 import { CardPair, Deck } from '../engine/types';
 import { MORE } from './moreCards';
 import { EXTRA } from './extraCards';
+import { SA_MORE } from './saCards';
 
 function chunkIntoCards(words: string[]): string[][] {
   const cards: string[][] = [];
@@ -307,7 +308,7 @@ export const DECKS: Deck[] = [
   { id: 'sports', name: 'Sports', cards: chunkIntoCards([...sports.slice(0, pairLen(sports, sportsYellow)), ...MORE.sports.blue, ...EXTRA.sports.blue]), cardsYellow: chunkIntoCards([...sportsYellow.slice(0, pairLen(sports, sportsYellow)), ...MORE.sports.yellow, ...EXTRA.sports.yellow]) },
   { id: 'geography', name: 'Geography', cards: chunkIntoCards([...geography.slice(0, pairLen(geography, geographyYellow)), ...MORE.geography.blue, ...EXTRA.geography.blue]), cardsYellow: chunkIntoCards([...geographyYellow.slice(0, pairLen(geography, geographyYellow)), ...MORE.geography.yellow, ...EXTRA.geography.yellow]) },
   { id: 'entertainment', name: 'Entertainment', cards: chunkIntoCards([...entertainment.slice(0, pairLen(entertainment, entertainmentYellow)), ...MORE.entertainment.blue, ...EXTRA.entertainment.blue]), cardsYellow: chunkIntoCards([...entertainmentYellow.slice(0, pairLen(entertainment, entertainmentYellow)), ...MORE.entertainment.yellow, ...EXTRA.entertainment.yellow]) },
-  { id: 'sa-trending', name: 'SA Trending', cards: chunkIntoCards(saTrending), cardsYellow: chunkIntoCards(saTrendingYellow) },
+  { id: 'sa-trending', name: 'SA Trending', cards: chunkIntoCards([...saTrending, ...SA_MORE.blue]), cardsYellow: chunkIntoCards([...saTrendingYellow, ...SA_MORE.yellow]) },
 ];
 
 export function getDeckById(id: string, allDecks: Deck[] = DECKS): Deck | undefined {
