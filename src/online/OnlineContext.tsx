@@ -114,6 +114,7 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
     setPlayerId(null);
     setRoom(null);
     setGameState(null);
+    setError(null);
   }, [send]);
 
   const clearError = useCallback(() => setError(null), []);

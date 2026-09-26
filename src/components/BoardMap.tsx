@@ -33,10 +33,15 @@ export default function BoardMap({ teams, target, highlightTeamId, startFrom }: 
   const [width, setWidth] = useState(0);
   const [, rerender] = useState(0);
   const rowCount = Math.ceil((target + 1) / PER_ROW);
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   // estimate from the screen until the real width is measured, so the board never renders empty
-  const boardW = width || Math.min(360, screenW - 96);
-  const size = boardW > 0 ? (boardW - GAP * (PER_ROW - 1)) / PER_ROW : 0;
+  const availW = width || Math.min(360, screenW - 96);
+  // long boards (high targets) shrink so the rest of the screen still fits on a phone
+  const maxH = Math.max(150, screenH * 0.32);
+  const size = availW > 0
+    ? Math.min((availW - GAP * (PER_ROW - 1)) / PER_ROW, (maxH - GAP * (rowCount - 1)) / rowCount)
+    : 0;
+  const boardW = size * PER_ROW + GAP * (PER_ROW - 1);
 
   const clamp = (n: number) => Math.max(0, Math.min(n, target));
   const shownSquare = useRef<Record<string, number>>({});
@@ -122,8 +127,8 @@ export default function BoardMap({ teams, target, highlightTeamId, startFrom }: 
   const winBg = winGlow.interpolate({ inputRange: [0, 1], outputRange: [colors.red, '#F07A55'] });
 
   return (
-    <View style={styles.wrap}>
-      <View style={[styles.board, { height: size ? rowCount * (size + GAP) - GAP : 0 }]} onLayout={onLayout}>
+    <View style={styles.wrap} onLayout={onLayout}>
+      <View style={[styles.board, { width: boardW, height: size ? rowCount * (size + GAP) - GAP : 0 }]}>
         {size > 0 &&
           squares.map((sq) => {
             const c = squareCenter(sq, size, rowCount);
@@ -191,12 +196,12 @@ export default function BoardMap({ teams, target, highlightTeamId, startFrom }: 
 
 const styles = StyleSheet.create({
   wrap: { width: '100%', maxWidth: 360, alignSelf: 'center', marginBottom: 16 },
-  board: { width: '100%', position: 'relative' },
+  board: { position: 'relative', alignSelf: 'center' },
   square: { position: 'absolute', borderRadius: 6, padding: 3 },
   squareBlue: { backgroundColor: '#D6E4EF' },
   squareYellow: { backgroundColor: '#F6E7B3' },
   squareStart: { backgroundColor: colors.ink },
-  squareNum: { fontSize: 9, color: colors.inkSoft, fontFamily: fonts.bodySemiBold },
+  squareNum: { fontSize: 11, color: colors.inkSoft, fontFamily: fonts.bodySemiBold },
   squareNumLight: { color: colors.cream },
   piece: {
     position: 'absolute',
@@ -216,7 +221,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   pieceActive: { borderColor: colors.gold },
-  pieceText: { fontSize: 9, color: '#fff', fontFamily: fonts.bodySemiBold },
+  pieceText: { fontSize: 10, color: '#fff', fontFamily: fonts.bodySemiBold },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8, justifyContent: 'center' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },

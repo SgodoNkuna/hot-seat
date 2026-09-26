@@ -2,6 +2,7 @@ import { CardPair, Deck } from '../engine/types';
 import { MORE } from './moreCards';
 import { EXTRA } from './extraCards';
 import { SA_MORE } from './saCards';
+import { BATCH4 } from './batch4Cards';
 
 function chunkIntoCards(words: string[]): string[][] {
   const cards: string[][] = [];
@@ -303,11 +304,11 @@ function pairLen(a: string[], b: string[]): number {
 }
 
 export const DECKS: Deck[] = [
-  { id: 'general', name: 'General Knowledge', cards: chunkIntoCards([...generalKnowledge.slice(0, pairLen(generalKnowledge, generalKnowledgeYellow)), ...MORE.general.blue, ...EXTRA.general.blue]), cardsYellow: chunkIntoCards([...generalKnowledgeYellow.slice(0, pairLen(generalKnowledge, generalKnowledgeYellow)), ...MORE.general.yellow, ...EXTRA.general.yellow]) },
-  { id: 'movies', name: 'Movies', cards: chunkIntoCards([...movies.slice(0, pairLen(movies, moviesYellow)), ...MORE.movies.blue, ...EXTRA.movies.blue]), cardsYellow: chunkIntoCards([...moviesYellow.slice(0, pairLen(movies, moviesYellow)), ...MORE.movies.yellow, ...EXTRA.movies.yellow]) },
-  { id: 'sports', name: 'Sports', cards: chunkIntoCards([...sports.slice(0, pairLen(sports, sportsYellow)), ...MORE.sports.blue, ...EXTRA.sports.blue]), cardsYellow: chunkIntoCards([...sportsYellow.slice(0, pairLen(sports, sportsYellow)), ...MORE.sports.yellow, ...EXTRA.sports.yellow]) },
-  { id: 'geography', name: 'Geography', cards: chunkIntoCards([...geography.slice(0, pairLen(geography, geographyYellow)), ...MORE.geography.blue, ...EXTRA.geography.blue]), cardsYellow: chunkIntoCards([...geographyYellow.slice(0, pairLen(geography, geographyYellow)), ...MORE.geography.yellow, ...EXTRA.geography.yellow]) },
-  { id: 'entertainment', name: 'Entertainment', cards: chunkIntoCards([...entertainment.slice(0, pairLen(entertainment, entertainmentYellow)), ...MORE.entertainment.blue, ...EXTRA.entertainment.blue]), cardsYellow: chunkIntoCards([...entertainmentYellow.slice(0, pairLen(entertainment, entertainmentYellow)), ...MORE.entertainment.yellow, ...EXTRA.entertainment.yellow]) },
+  { id: 'general', name: 'General Knowledge', cards: chunkIntoCards([...generalKnowledge.slice(0, pairLen(generalKnowledge, generalKnowledgeYellow)), ...MORE.general.blue, ...EXTRA.general.blue, ...BATCH4.general.blue]), cardsYellow: chunkIntoCards([...generalKnowledgeYellow.slice(0, pairLen(generalKnowledge, generalKnowledgeYellow)), ...MORE.general.yellow, ...EXTRA.general.yellow, ...BATCH4.general.yellow]) },
+  { id: 'movies', name: 'Movies', cards: chunkIntoCards([...movies.slice(0, pairLen(movies, moviesYellow)), ...MORE.movies.blue, ...EXTRA.movies.blue, ...BATCH4.movies.blue]), cardsYellow: chunkIntoCards([...moviesYellow.slice(0, pairLen(movies, moviesYellow)), ...MORE.movies.yellow, ...EXTRA.movies.yellow, ...BATCH4.movies.yellow]) },
+  { id: 'sports', name: 'Sports', cards: chunkIntoCards([...sports.slice(0, pairLen(sports, sportsYellow)), ...MORE.sports.blue, ...EXTRA.sports.blue, ...BATCH4.sports.blue]), cardsYellow: chunkIntoCards([...sportsYellow.slice(0, pairLen(sports, sportsYellow)), ...MORE.sports.yellow, ...EXTRA.sports.yellow, ...BATCH4.sports.yellow]) },
+  { id: 'geography', name: 'Geography', cards: chunkIntoCards([...geography.slice(0, pairLen(geography, geographyYellow)), ...MORE.geography.blue, ...EXTRA.geography.blue, ...BATCH4.geography.blue]), cardsYellow: chunkIntoCards([...geographyYellow.slice(0, pairLen(geography, geographyYellow)), ...MORE.geography.yellow, ...EXTRA.geography.yellow, ...BATCH4.geography.yellow]) },
+  { id: 'entertainment', name: 'Entertainment', cards: chunkIntoCards([...entertainment.slice(0, pairLen(entertainment, entertainmentYellow)), ...MORE.entertainment.blue, ...EXTRA.entertainment.blue, ...BATCH4.entertainment.blue]), cardsYellow: chunkIntoCards([...entertainmentYellow.slice(0, pairLen(entertainment, entertainmentYellow)), ...MORE.entertainment.yellow, ...EXTRA.entertainment.yellow, ...BATCH4.entertainment.yellow]) },
   { id: 'sa-trending', name: 'SA Trending', cards: chunkIntoCards([...saTrending, ...SA_MORE.blue]), cardsYellow: chunkIntoCards([...saTrendingYellow, ...SA_MORE.yellow]) },
 ];
 

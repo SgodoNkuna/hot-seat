@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useIsFocused } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/types';
 import { useOnline } from '../online/OnlineContext';
 import { DECKS } from '../data/decks';
@@ -34,12 +35,14 @@ export default function OnlineHomeScreen({ navigation }: Props) {
     setSelectedDeckIds((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
   }
 
+  const isFocused = useIsFocused();
+  // only claim errors while this screen is showing; otherwise the lobby shows them
   React.useEffect(() => {
-    if (error) {
+    if (error && isFocused) {
       setBanner(error);
       clearError();
     }
-  }, [error]);
+  }, [error, isFocused]);
 
   React.useEffect(() => {
     if (room) {

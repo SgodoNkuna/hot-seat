@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { Audio } from 'expo-av';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
@@ -59,7 +59,7 @@ export default function OnlinePlayScreen({ navigation }: Props) {
     const lastTeam = gameState.teams.find((t) => t.id === gameState.lastTurnTeamId);
     const isOtherTeam = myTeam && myTeam.id !== gameState.lastTurnTeamId;
     return (
-      <View style={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={styles.turnCard}>
           <Text style={styles.upNextLabel}>Time's Up!</Text>
           <Text style={styles.teamNameBig}>{lastTeam?.name}</Text>
@@ -101,13 +101,13 @@ export default function OnlinePlayScreen({ navigation }: Props) {
             <Text style={styles.waitingText}>Waiting for the other team to confirm the score…</Text>
           )}
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
   if (!gameState.isTurnActive && !gameState.currentCard) {
     return (
-      <View style={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={styles.turnCard}>
           <Text style={styles.upNextLabel}>Up Next</Text>
           <Text style={styles.teamNameBig}>{currentTeam.name}</Text>
@@ -140,7 +140,7 @@ export default function OnlinePlayScreen({ navigation }: Props) {
             <Text style={styles.waitingText}>Waiting for {currentTeam.name} to start their turn…</Text>
           )}
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -215,6 +215,8 @@ export default function OnlinePlayScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  scroll: { flex: 1, backgroundColor: colors.ink },
+  scrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   hidden: { display: 'none' },
   container: { flex: 1, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', padding: 24 },
   teamLabel: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: colors.gold, marginBottom: 22 },
