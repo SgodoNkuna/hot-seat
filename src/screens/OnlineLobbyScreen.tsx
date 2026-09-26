@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useOnline } from '../online/OnlineContext';
@@ -12,6 +12,7 @@ const TARGET_OPTIONS = [10, 20, 30, 50];
 const TURN_OPTIONS = [15, 30];
 const MODE_OPTIONS: { id: GameMode; label: string }[] = [
   { id: 'classic', label: 'Classic' },
+  { id: 'board', label: 'Board Map' },
   { id: 'themed', label: 'Themed' },
   { id: 'blitz', label: 'Blitz' },
   { id: 'suddenDeath', label: 'Sudden Death' },
@@ -24,10 +25,6 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
     useOnline();
 
   const isHost = room?.hostPlayerId === playerId;
-
-  useEffect(() => {
-    if (error) Alert.alert('Error', error, [{ text: 'OK', onPress: clearError }]);
-  }, [error]);
 
   useEffect(() => {
     if (room?.status === 'playing' && gameState) {
@@ -44,6 +41,11 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {error && (
+        <Pressable style={styles.errorBanner} onPress={clearError}>
+          <Text style={styles.errorText}>{error}  (tap to dismiss)</Text>
+        </Pressable>
+      )}
       <Text style={styles.codeLabel}>Room Code</Text>
       <Text style={styles.code}>{room.code}</Text>
       <Text style={styles.hint}>Share this code so others can join.</Text>
@@ -139,6 +141,11 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
             />
           </View>
 
+          <View style={styles.switchRow}>
+            <Text style={styles.heading}>Random Card Side</Text>
+            <Switch value={!!room.config.randomSide} onValueChange={(v) => updateConfig({ randomSide: v })} />
+          </View>
+
           <Pressable style={styles.startButton} onPress={startGame}>
             <Text style={styles.startButtonText}>START THE SHOW</Text>
           </Pressable>
@@ -157,6 +164,8 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 20, paddingBottom: 60, alignItems: 'center' },
+  errorBanner: { width: '100%', backgroundColor: colors.gold, borderRadius: 10, padding: 12, marginBottom: 8 },
+  errorText: { color: colors.ink, fontFamily: fonts.bodySemiBold, textAlign: 'center' },
   codeLabel: { color: colors.inkFaint, fontSize: 12, fontFamily: fonts.bodySemiBold, letterSpacing: 1, marginTop: 8 },
   code: {
     fontFamily: fonts.display,

@@ -53,7 +53,7 @@ export default function App() {
               <Stack.Screen
                 name="Play"
                 component={PlayScreen}
-                options={{ title: '', headerBackVisible: false, gestureEnabled: false }}
+                options={{ title: '', headerBackVisible: false, headerLeft: () => null, gestureEnabled: false }}
               />
               <Stack.Screen
                 name="Win"
@@ -78,7 +78,7 @@ export default function App() {
               <Stack.Screen
                 name="OnlinePlay"
                 component={OnlinePlayScreen}
-                options={{ title: '', headerBackVisible: false, gestureEnabled: false }}
+                options={{ title: '', headerBackVisible: false, headerLeft: () => null, gestureEnabled: false }}
               />
               <Stack.Screen
                 name="OnlineWin"

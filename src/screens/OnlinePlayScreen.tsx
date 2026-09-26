@@ -1,16 +1,18 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
 import { Audio } from 'expo-av';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useOnline } from '../online/OnlineContext';
 import CountdownRing from '../components/CountdownRing';
+import BoardMap from '../components/BoardMap';
 import { colors, fonts } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlinePlay'>;
 
 export default function OnlinePlayScreen({ navigation }: Props) {
-  const { gameState, room, playerId, startTurn, correct, skip, flip, nextCard, endTurn } = useOnline();
+  const { gameState, room, playerId, startTurn, correct, skip, flip, nextCard, endTurn, adjustScore, confirmScore } =
+    useOnline();
   const buzzerRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
@@ -20,10 +22,10 @@ export default function OnlinePlayScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    if (gameState?.winnerId) {
+    if (gameState?.winnerId && gameState.scoreConfirmed) {
       navigation.replace('OnlineWin');
     }
-  }, [gameState?.winnerId]);
+  }, [gameState?.winnerId, gameState?.scoreConfirmed]);
 
   useEffect(() => {
     if (gameState?.timeRemaining === 0 && !gameState.isTurnActive) {
@@ -41,6 +43,9 @@ export default function OnlinePlayScreen({ navigation }: Props) {
     }
   }
 
+  const { height } = useWindowDimensions();
+  const compact = height < 760;
+
   if (!gameState || !room) return null;
 
   const currentTeam = gameState.teams[gameState.currentTeamIndex];
@@ -49,6 +54,56 @@ export default function OnlinePlayScreen({ navigation }: Props) {
   const cardWords = gameState.currentCard ?? [];
   const sideComplete = gameState.isTurnActive && gameState.currentCard !== null && gameState.pendingIndices.length === 0;
   const canFlip = sideComplete && gameState.config.allowFlip && !!gameState.currentCardOtherSide;
+
+  if (!gameState.isTurnActive && gameState.lastTurnTeamId && !gameState.scoreConfirmed) {
+    const lastTeam = gameState.teams.find((t) => t.id === gameState.lastTurnTeamId);
+    const isOtherTeam = myTeam && myTeam.id !== gameState.lastTurnTeamId;
+    return (
+      <View style={styles.container}>
+        <View style={styles.turnCard}>
+          <Text style={styles.upNextLabel}>Time's Up!</Text>
+          <Text style={styles.teamNameBig}>{lastTeam?.name}</Text>
+          <Text style={styles.recapText}>
+            Guessed {gameState.lastTurnGuessed} · Skipped {gameState.lastTurnSkipped}
+          </Text>
+          <Text style={styles.scoreBig}>{lastTeam?.score} pts</Text>
+          {gameState.config.mode === 'board' && (
+            <BoardMap teams={gameState.teams} target={gameState.config.targetScore} highlightTeamId={gameState.lastTurnTeamId}
+              startFrom={gameState.lastTurnTeamId ? { [gameState.lastTurnTeamId]: (lastTeam?.score ?? 0) - gameState.lastTurnGuessed } : undefined}
+            />
+          )}
+          {gameState.lastTurnWords.length > 0 && (
+            <View style={styles.wordChipRow}>
+              {gameState.lastTurnWords.map((word, i) => (
+                <View key={i} style={styles.wordChip}>
+                  <Text style={styles.wordChipText}>{word}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {isOtherTeam ? (
+            <>
+              <Text style={styles.confirmHint}>Check the score before play continues</Text>
+              <View style={styles.adjustRow}>
+                <Pressable style={styles.adjustButton} onPress={() => adjustScore(-1)}>
+                  <Text style={styles.adjustButtonText}>−1</Text>
+                </Pressable>
+                <Pressable style={styles.adjustButton} onPress={() => adjustScore(1)}>
+                  <Text style={styles.adjustButtonText}>+1</Text>
+                </Pressable>
+              </View>
+              <Pressable style={styles.startButton} onPress={confirmScore}>
+                <Text style={styles.startButtonText}>Confirm Score</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.waitingText}>Waiting for the other team to confirm the score…</Text>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   if (!gameState.isTurnActive && !gameState.currentCard) {
     return (
@@ -61,7 +116,10 @@ export default function OnlinePlayScreen({ navigation }: Props) {
             <Text style={styles.suddenDeathBadge}>⚡ Sudden Death — final round!</Text>
           )}
 
-          <View style={styles.scoreList}>
+          {gameState.config.mode === 'board' && (
+            <BoardMap teams={gameState.teams} target={gameState.config.targetScore} highlightTeamId={currentTeam.id} />
+          )}
+          <View style={[gameState.config.mode === 'board' ? styles.hidden : styles.scoreList]}>
             {gameState.teams.map((t) => {
               const eliminated = gameState.eliminatedTeamIds.includes(t.id);
               return (
@@ -90,15 +148,16 @@ export default function OnlinePlayScreen({ navigation }: Props) {
     <View style={styles.container}>
       <Text style={styles.teamLabel}>{currentTeam.name}'s Turn</Text>
 
-      <CountdownRing totalSeconds={gameState.config.turnSeconds} timeRemaining={gameState.timeRemaining} />
+      <CountdownRing totalSeconds={gameState.config.turnSeconds} timeRemaining={gameState.timeRemaining} size={compact ? 120 : 184} />
 
       <View
         style={[
           styles.wordCard,
-          gameState.config.allowFlip && (gameState.cardSide === 'blue' ? styles.wordCardBlue : styles.wordCardYellow),
+          compact && styles.wordCardCompact,
+          (gameState.config.allowFlip || gameState.config.randomSide) && (gameState.cardSide === 'blue' ? styles.wordCardBlue : styles.wordCardYellow),
         ]}
       >
-        {gameState.config.allowFlip && (
+        {(gameState.config.allowFlip || gameState.config.randomSide) && (
           <Text style={[styles.sideLabel, gameState.cardSide === 'blue' ? styles.sideLabelBlue : styles.sideLabelYellow]}>
             {gameState.cardSide === 'blue' ? 'BLUE SIDE' : 'YELLOW SIDE'}
           </Text>
@@ -107,7 +166,7 @@ export default function OnlinePlayScreen({ navigation }: Props) {
           const done = gameState.completedIndices.includes(i);
           const active = !done && gameState.pendingIndices[0] === i;
           return (
-            <Text key={i} style={[styles.wordText, done && styles.wordTextDone, active && styles.wordTextActive]}>
+            <Text key={i} style={[styles.wordText, compact && styles.wordTextCompact, done && styles.wordTextDone, active && styles.wordTextActive]}>
               {word}
             </Text>
           );
@@ -156,6 +215,7 @@ export default function OnlinePlayScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
   container: { flex: 1, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', padding: 24 },
   teamLabel: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: colors.gold, marginBottom: 22 },
   wordCard: {
@@ -174,6 +234,8 @@ const styles = StyleSheet.create({
   sideLabelBlue: { color: colors.blue },
   sideLabelYellow: { color: colors.yellowDark },
   wordText: { fontFamily: fonts.bodySemiBold, fontSize: 22, color: colors.ink, marginVertical: 6 },
+  wordCardCompact: { marginTop: 12, paddingVertical: 14 },
+  wordTextCompact: { fontSize: 18, marginVertical: 3 },
   wordTextDone: { color: colors.inkFaint, textDecorationLine: 'line-through' },
   wordTextActive: { color: colors.red },
   flipButtonToYellow: { backgroundColor: colors.yellow, borderBottomWidth: 6, borderBottomColor: colors.yellowDark },
@@ -191,6 +253,25 @@ const styles = StyleSheet.create({
   upNextLabel: { color: colors.inkFaint, fontSize: 13, letterSpacing: 2, marginBottom: 8, fontFamily: fonts.bodySemiBold },
   teamNameBig: { fontFamily: fonts.display, color: colors.ink, fontSize: 28, marginBottom: 4 },
   roundLabel: { color: colors.inkFaint, fontSize: 13, marginBottom: 12, fontFamily: fonts.body },
+  recapText: { color: colors.inkSoft, fontSize: 15, marginTop: 4, fontFamily: fonts.body },
+  scoreBig: { fontFamily: fonts.display, fontSize: 30, color: colors.red, marginTop: 10, marginBottom: 6 },
+  confirmHint: { color: colors.inkFaint, fontSize: 12, marginTop: 8, marginBottom: 14, fontFamily: fonts.body, textAlign: 'center' },
+  adjustRow: { flexDirection: 'row', gap: 16, marginBottom: 18 },
+  adjustButton: {
+    width: 60,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: colors.tan,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.ink,
+    borderBottomWidth: 5,
+  },
+  adjustButtonText: { fontFamily: fonts.display, fontSize: 16, color: colors.ink },
+  wordChipRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 4, marginBottom: 14, maxWidth: '100%' },
+  wordChip: { backgroundColor: colors.tan, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  wordChipText: { color: colors.ink, fontSize: 12, fontFamily: fonts.bodySemiBold },
   suddenDeathBadge: { color: colors.red, fontFamily: fonts.bodySemiBold, fontSize: 13, marginBottom: 12 },
   scoreList: { marginBottom: 24, alignItems: 'center' },
   scoreLine: { color: colors.inkSoft, fontSize: 15, marginVertical: 2, fontFamily: fonts.body },

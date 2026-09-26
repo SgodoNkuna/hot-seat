@@ -1,4 +1,4 @@
-export type GameMode = 'classic' | 'suddenDeath' | 'elimination' | 'reverse' | 'blitz' | 'themed';
+export type GameMode = 'classic' | 'suddenDeath' | 'elimination' | 'reverse' | 'blitz' | 'themed' | 'board';
 
 export type MatchFormat = 'single' | 'bestOf3';
 
@@ -31,6 +31,7 @@ export interface GameConfig {
   deckIds: string[];
   allowSkip: boolean;
   allowFlip: boolean; // blue/yellow two-sided card rule
+  randomSide?: boolean; // each card randomly starts on blue or yellow
   matchFormat: MatchFormat;
   suddenDeathMargin: number; // how close to targetScore triggers sudden death
 }
@@ -48,6 +49,7 @@ export interface GameState {
   pendingIndices: number[]; // indices into currentCard still to be guessed, in attempt order
   completedIndices: number[]; // indices into currentCard already guessed correctly
   guessedThisTurn: number;
+  guessedWords: string[]; // actual words guessed correctly this turn, in order (survives flips)
   skippedThisTurn: number;
   timeRemaining: number;
   isTurnActive: boolean;
@@ -57,4 +59,9 @@ export interface GameState {
   turnsPlayedThisRound: number;
   suddenDeathActive: boolean;
   suddenDeathTurnsRemaining: number;
+  lastTurnTeamId: string | null;
+  lastTurnGuessed: number;
+  lastTurnWords: string[];
+  lastTurnSkipped: number;
+  scoreConfirmed: boolean;
 }

@@ -22,6 +22,8 @@ interface OnlineContextValue {
   flip: () => void;
   nextCard: () => void;
   endTurn: () => void;
+  adjustScore: (delta: number) => void;
+  confirmScore: () => void;
   leaveAndDisconnect: () => void;
   clearError: () => void;
 }
@@ -101,6 +103,8 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
   const flip = useCallback(() => send({ type: 'flip' }), [send]);
   const nextCard = useCallback(() => send({ type: 'next_card' }), [send]);
   const endTurn = useCallback(() => send({ type: 'end_turn' }), [send]);
+  const adjustScore = useCallback((delta: number) => send({ type: 'adjust_score', delta }), [send]);
+  const confirmScore = useCallback(() => send({ type: 'confirm_score' }), [send]);
 
   const leaveAndDisconnect = useCallback(() => {
     send({ type: 'leave' });
@@ -134,6 +138,8 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
         flip,
         nextCard,
         endTurn,
+        adjustScore,
+        confirmScore,
         leaveAndDisconnect,
         clearError,
       }}

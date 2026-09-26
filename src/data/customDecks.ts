@@ -38,3 +38,38 @@ export function createCustomDeck(name: string, words: string[], yellowWords?: st
     isCustom: true,
   };
 }
+
+const SHARE_PREFIX = 'HOTSEAT-DECK-1:';
+
+/** Encodes a deck as a plain-text code that can be copy-pasted or sent to anyone to import. */
+export function encodeDeckShareCode(deck: Deck): string {
+  const payload = { name: deck.name, cards: deck.cards, cardsYellow: deck.cardsYellow };
+  return SHARE_PREFIX + encodeURIComponent(JSON.stringify(payload));
+}
+
+/** Decodes a share code back into an importable deck, or null if it isn't a valid Hot Seat deck code. */
+export function decodeDeckShareCode(code: string): Deck | null {
+  const trimmed = code.trim();
+  if (!trimmed.startsWith(SHARE_PREFIX)) return null;
+  try {
+    const payload = JSON.parse(decodeURIComponent(trimmed.slice(SHARE_PREFIX.length)));
+    if (
+      typeof payload.name !== 'string' ||
+      !payload.name.trim() ||
+      !Array.isArray(payload.cards) ||
+      payload.cards.length === 0
+    ) {
+      return null;
+    }
+    const cardsYellow = Array.isArray(payload.cardsYellow) && payload.cardsYellow.length > 0 ? payload.cardsYellow : undefined;
+    return {
+      id: `custom-${Date.now()}`,
+      name: payload.name.trim(),
+      cards: payload.cards,
+      ...(cardsYellow ? { cardsYellow } : {}),
+      isCustom: true,
+    };
+  } catch {
+    return null;
+  }
+}

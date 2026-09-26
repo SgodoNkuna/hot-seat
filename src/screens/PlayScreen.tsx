@@ -1,11 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated , useWindowDimensions } from 'react-native';
 import { Audio } from 'expo-av';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../state/GameContext';
-import { startTurn, tick, markCorrect, markSkip, endTurn, flipCard, nextCard, getCurrentTeam } from '../engine/GameEngine';
+import {
+  startTurn,
+  tick,
+  markCorrect,
+  markSkip,
+  endTurn,
+  flipCard,
+  nextCard,
+  getCurrentTeam,
+  adjustScore,
+  confirmScore,
+} from '../engine/GameEngine';
 import CountdownRing from '../components/CountdownRing';
+import BoardMap from '../components/BoardMap';
 import { colors, fonts } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Play'>;
@@ -23,10 +35,10 @@ export default function PlayScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    if (state?.winnerId) {
+    if (state?.winnerId && state.scoreConfirmed) {
       navigation.replace('Win');
     }
-  }, [state?.winnerId]);
+  }, [state?.winnerId, state?.scoreConfirmed]);
 
   useEffect(() => {
     if (!state?.isTurnActive) return;
@@ -59,12 +71,15 @@ export default function PlayScreen({ navigation }: Props) {
 
   function handleEndTurnEarly() {
     update((s) => endTurn(s));
+  }
+
+  function handleConfirmScore() {
+    update((s) => confirmScore(s));
     setShowTurnCard(true);
   }
 
-  function handleNextTurnFromRecap() {
-    setShowTurnCard(true);
-  }
+  const { height } = useWindowDimensions();
+  const compact = height < 760;
 
   if (!state) return null;
 
@@ -84,7 +99,10 @@ export default function PlayScreen({ navigation }: Props) {
             <Text style={styles.suddenDeathBadge}>⚡ Sudden Death — final round!</Text>
           )}
 
-          <View style={styles.scoreList}>
+          {state.config.mode === 'board' && (
+            <BoardMap teams={state.teams} target={state.config.targetScore} highlightTeamId={currentTeam.id} />
+          )}
+          <View style={[state.config.mode === 'board' ? styles.hidden : styles.scoreList]}>
             {state.teams.map((t) => {
               const eliminated = state.eliminatedTeamIds.includes(t.id);
               return (
@@ -108,16 +126,41 @@ export default function PlayScreen({ navigation }: Props) {
   const turnJustEnded = !state.isTurnActive;
 
   if (turnJustEnded) {
+    const lastTeam = state.teams.find((t) => t.id === state.lastTurnTeamId) ?? currentTeam;
     return (
       <View style={styles.container}>
         <View style={styles.turnCard}>
           <Text style={styles.upNextLabel}>Time's Up!</Text>
-          <Text style={styles.teamNameBig}>{currentTeam.name}</Text>
+          <Text style={styles.teamNameBig}>{lastTeam.name}</Text>
           <Text style={styles.recapText}>
-            Guessed {state.guessedThisTurn} · Skipped {state.skippedThisTurn}
+            Guessed {state.lastTurnGuessed} · Skipped {state.lastTurnSkipped}
           </Text>
-          <Pressable style={styles.startButton} onPress={handleNextTurnFromRecap}>
-            <Text style={styles.startButtonText}>Continue</Text>
+          <Text style={styles.scoreBig}>{lastTeam.score} pts</Text>
+          {state.config.mode === 'board' && (
+            <BoardMap teams={state.teams} target={state.config.targetScore} highlightTeamId={state.lastTurnTeamId}
+              startFrom={state.lastTurnTeamId ? { [state.lastTurnTeamId]: lastTeam.score - state.lastTurnGuessed } : undefined}
+            />
+          )}
+          {state.lastTurnWords.length > 0 && (
+            <View style={styles.wordChipRow}>
+              {state.lastTurnWords.map((word, i) => (
+                <View key={i} style={styles.wordChip}>
+                  <Text style={styles.wordChipText}>{word}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={styles.confirmHint}>Pass the phone — have the other team check the score</Text>
+          <View style={styles.adjustRow}>
+            <Pressable style={styles.adjustButton} onPress={() => update((s) => adjustScore(s, -1))}>
+              <Text style={styles.adjustButtonText}>−1</Text>
+            </Pressable>
+            <Pressable style={styles.adjustButton} onPress={() => update((s) => adjustScore(s, 1))}>
+              <Text style={styles.adjustButtonText}>+1</Text>
+            </Pressable>
+          </View>
+          <Pressable style={styles.startButton} onPress={handleConfirmScore}>
+            <Text style={styles.startButtonText}>Confirm Score</Text>
           </Pressable>
         </View>
       </View>
@@ -128,15 +171,16 @@ export default function PlayScreen({ navigation }: Props) {
     <View style={styles.container}>
       <Text style={styles.teamLabel}>{currentTeam.name}'s Turn</Text>
 
-      <CountdownRing totalSeconds={state.config.turnSeconds} timeRemaining={state.timeRemaining} />
+      <CountdownRing totalSeconds={state.config.turnSeconds} timeRemaining={state.timeRemaining} size={compact ? 120 : 184} />
 
       <View
         style={[
           styles.wordCard,
-          state.config.allowFlip && (state.cardSide === 'blue' ? styles.wordCardBlue : styles.wordCardYellow),
+          compact && styles.wordCardCompact,
+          (state.config.allowFlip || state.config.randomSide) && (state.cardSide === 'blue' ? styles.wordCardBlue : styles.wordCardYellow),
         ]}
       >
-        {state.config.allowFlip && (
+        {(state.config.allowFlip || state.config.randomSide) && (
           <Text style={[styles.sideLabel, state.cardSide === 'blue' ? styles.sideLabelBlue : styles.sideLabelYellow]}>
             {state.cardSide === 'blue' ? 'BLUE SIDE' : 'YELLOW SIDE'}
           </Text>
@@ -145,7 +189,7 @@ export default function PlayScreen({ navigation }: Props) {
           const done = state.completedIndices.includes(i);
           const active = !done && state.pendingIndices[0] === i;
           return (
-            <Text key={i} style={[styles.wordText, done && styles.wordTextDone, active && styles.wordTextActive]}>
+            <Text key={i} style={[styles.wordText, compact && styles.wordTextCompact, done && styles.wordTextDone, active && styles.wordTextActive]}>
               {word}
             </Text>
           );
@@ -198,6 +242,7 @@ export default function PlayScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
   container: { flex: 1, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', padding: 24 },
   teamLabel: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: colors.gold, marginBottom: 22 },
   wordCard: {
@@ -216,6 +261,8 @@ const styles = StyleSheet.create({
   sideLabelBlue: { color: colors.blue },
   sideLabelYellow: { color: colors.yellowDark },
   wordText: { fontFamily: fonts.bodySemiBold, fontSize: 22, color: colors.ink, marginVertical: 6 },
+  wordCardCompact: { marginTop: 12, paddingVertical: 14 },
+  wordTextCompact: { fontSize: 18, marginVertical: 3 },
   wordTextDone: { color: colors.inkFaint, textDecorationLine: 'line-through' },
   wordTextActive: { color: colors.red },
   flipButtonToYellow: { backgroundColor: colors.yellow, borderBottomWidth: 6, borderBottomColor: colors.yellowDark },
@@ -243,7 +290,25 @@ const styles = StyleSheet.create({
   scoreLine: { color: colors.inkSoft, fontSize: 15, marginVertical: 2, fontFamily: fonts.body },
   scoreLineOut: { color: colors.red, textDecorationLine: 'line-through' },
   suddenDeathBadge: { color: colors.red, fontFamily: fonts.bodySemiBold, fontSize: 13, marginBottom: 12 },
-  recapText: { color: colors.inkSoft, fontSize: 16, marginBottom: 24, fontFamily: fonts.body },
+  recapText: { color: colors.inkSoft, fontSize: 16, fontFamily: fonts.body },
+  scoreBig: { fontFamily: fonts.display, fontSize: 30, color: colors.red, marginTop: 10, marginBottom: 6 },
+  confirmHint: { color: colors.inkFaint, fontSize: 12, marginBottom: 16, fontFamily: fonts.body, textAlign: 'center' },
+  adjustRow: { flexDirection: 'row', gap: 16, marginBottom: 18 },
+  adjustButton: {
+    width: 60,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: colors.tan,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.ink,
+    borderBottomWidth: 5,
+  },
+  adjustButtonText: { fontFamily: fonts.display, fontSize: 16, color: colors.ink },
+  wordChipRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 4, marginBottom: 14, maxWidth: '100%' },
+  wordChip: { backgroundColor: colors.tan, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  wordChipText: { color: colors.ink, fontSize: 12, fontFamily: fonts.bodySemiBold },
   startButton: { backgroundColor: colors.red, paddingVertical: 18, paddingHorizontal: 40, borderRadius: 10, borderBottomWidth: 6, borderBottomColor: colors.redDark },
   startButtonText: { fontFamily: fonts.display, fontSize: 15, color: colors.cream, letterSpacing: 1 },
 });

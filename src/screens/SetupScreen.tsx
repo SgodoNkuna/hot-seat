@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Switch } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../state/GameContext';
@@ -14,6 +14,7 @@ const TARGET_OPTIONS = [10, 20, 30, 50];
 
 const MODES: { id: GameMode; label: string; blurb: string; fixedTurnSeconds?: number }[] = [
   { id: 'classic', label: 'Classic', blurb: 'First team to the target score wins.' },
+  { id: 'board', label: 'Board Map', blurb: 'Every correct word moves your team piece one square along the board. First to the WIN square takes it.' },
   { id: 'themed', label: 'Themed', blurb: 'Classic rules, locked to one category.' },
   { id: 'blitz', label: 'Blitz', blurb: '15-second turns, fast and chaotic.', fixedTurnSeconds: 15 },
   { id: 'suddenDeath', label: 'Sudden Death', blurb: 'Final showdown round once a team gets close to winning.' },
@@ -27,13 +28,14 @@ export default function SetupScreen({ navigation }: Props) {
     { id: 't1', name: 'Team 1', players: [], score: 0 },
     { id: 't2', name: 'Team 2', players: [], score: 0 },
   ]);
-  const [playerInput, setPlayerInput] = useState('');
-  const [activeTeamIndex, setActiveTeamIndex] = useState(0);
+  const [playerInputs, setPlayerInputs] = useState<Record<string, string>>({});
   const [mode, setMode] = useState<GameMode>('classic');
   const [targetScore, setTargetScore] = useState(30);
   const [turnSeconds, setTurnSeconds] = useState(30);
   const [allowSkip, setAllowSkip] = useState(true);
   const [allowFlip, setAllowFlip] = useState(false);
+  const [randomSide, setRandomSide] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
   const [matchFormat, setMatchFormat] = useState<MatchFormat>('single');
   const [customDecks, setCustomDecks] = useState<Deck[]>([]);
   const [selectedDecks, setSelectedDecks] = useState<string[]>(DECKS.map((d) => d.id));
@@ -53,16 +55,13 @@ export default function SetupScreen({ navigation }: Props) {
   function removeTeam(index: number) {
     if (teams.length <= 2) return;
     setTeams(teams.filter((_, i) => i !== index));
-    if (activeTeamIndex >= teams.length - 1) setActiveTeamIndex(0);
   }
 
-  function addPlayer() {
-    const name = playerInput.trim();
+  function addPlayer(teamId: string) {
+    const name = (playerInputs[teamId] ?? '').trim();
     if (!name) return;
-    setTeams((prev) =>
-      prev.map((t, i) => (i === activeTeamIndex ? { ...t, players: [...t.players, name] } : t))
-    );
-    setPlayerInput('');
+    setTeams((prev) => prev.map((t) => (t.id === teamId ? { ...t, players: [...t.players, name] } : t)));
+    setPlayerInputs((prev) => ({ ...prev, [teamId]: '' }));
   }
 
   function removePlayer(teamIndex: number, playerIndex: number) {
@@ -95,13 +94,15 @@ export default function SetupScreen({ navigation }: Props) {
   function startGame() {
     const missingPlayers = teams.some((t) => t.players.length === 0);
     if (missingPlayers) {
-      Alert.alert('Add players', 'Every team needs at least one player.');
+      const empty = teams.filter((t) => t.players.length === 0).map((t) => t.name).join(', ');
+      setBanner(`Add at least one player to: ${empty}`);
       return;
     }
     if (selectedDecks.length === 0) {
-      Alert.alert('Pick a deck', 'Select at least one category deck to play with.');
+      setBanner('Pick at least one category to play with.');
       return;
     }
+    setBanner(null);
     beginMatch(
       teams,
       {
@@ -111,6 +112,7 @@ export default function SetupScreen({ navigation }: Props) {
         deckIds: selectedDecks,
         allowSkip,
         allowFlip,
+        randomSide,
         matchFormat,
         suddenDeathMargin: 3,
       },
@@ -141,11 +143,7 @@ export default function SetupScreen({ navigation }: Props) {
       {teams.map((team, index) => (
         <View key={team.id} style={styles.teamCard}>
           <View style={styles.teamHeaderRow}>
-            <Pressable onPress={() => setActiveTeamIndex(index)}>
-              <Text style={[styles.teamName, activeTeamIndex === index && styles.teamNameActive]}>
-                {team.name}
-              </Text>
-            </Pressable>
+            <Text style={styles.teamName}>{team.name}</Text>
             {teams.length > 2 && (
               <Pressable onPress={() => removeTeam(index)}>
                 <Text style={styles.removeText}>Remove</Text>
@@ -160,22 +158,22 @@ export default function SetupScreen({ navigation }: Props) {
             ))}
             {team.players.length === 0 && <Text style={styles.emptyText}>No players yet</Text>}
           </View>
+          <View style={styles.addPlayerRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Player name"
+              placeholderTextColor={colors.inkFaint}
+              value={playerInputs[team.id] ?? ''}
+              onChangeText={(text) => setPlayerInputs((prev) => ({ ...prev, [team.id]: text }))}
+              onSubmitEditing={() => addPlayer(team.id)}
+              returnKeyType="done"
+            />
+            <Pressable style={styles.smallButton} onPress={() => addPlayer(team.id)}>
+              <Text style={styles.smallButtonText}>+ Add</Text>
+            </Pressable>
+          </View>
         </View>
       ))}
-
-      <View style={styles.addPlayerRow}>
-        <TextInput
-          style={styles.input}
-          placeholder={`Add player to ${teams[activeTeamIndex]?.name ?? 'team'}`}
-          placeholderTextColor={colors.inkFaint}
-          value={playerInput}
-          onChangeText={setPlayerInput}
-          onSubmitEditing={addPlayer}
-        />
-        <Pressable style={styles.smallButton} onPress={addPlayer}>
-          <Text style={styles.smallButtonText}>Add</Text>
-        </Pressable>
-      </View>
 
       <Pressable style={styles.linkButton} onPress={addTeam}>
         <Text style={styles.linkButtonText}>+ Add another team</Text>
@@ -235,6 +233,14 @@ export default function SetupScreen({ navigation }: Props) {
       )}
 
       <View style={styles.switchRow}>
+        <Text style={styles.heading}>Random Card Side</Text>
+        <Switch value={randomSide} onValueChange={setRandomSide} />
+      </View>
+      {randomSide && (
+        <Text style={styles.blurbText}>Each card lands on blue or yellow at random, so any turn can be easy or hard.</Text>
+      )}
+
+      <View style={styles.switchRow}>
         <Text style={styles.heading}>Best of 3 (Marathon)</Text>
         <Switch
           value={matchFormat === 'bestOf3'}
@@ -267,6 +273,7 @@ export default function SetupScreen({ navigation }: Props) {
         <Text style={styles.linkButtonText}>+ Manage custom decks</Text>
       </Pressable>
 
+      {banner && <Text style={styles.banner}>{banner}</Text>}
       <Pressable style={styles.startButton} onPress={startGame}>
         <Text style={styles.startButtonText}>START THE SHOW</Text>
       </Pressable>
@@ -281,14 +288,13 @@ const styles = StyleSheet.create({
   blurbText: { color: colors.inkSoft, fontSize: 13, marginTop: 4, fontFamily: fonts.body },
   teamCard: { backgroundColor: colors.paper, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 3, borderColor: colors.ink, borderBottomWidth: 6 },
   teamHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  teamName: { fontFamily: fonts.display, fontSize: 13, color: colors.inkFaint },
-  teamNameActive: { color: colors.red },
+  teamName: { fontFamily: fonts.display, fontSize: 13, color: colors.red },
   removeText: { color: colors.red, fontSize: 13, fontFamily: fonts.bodySemiBold },
   playerChipRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 8 },
   chip: { backgroundColor: colors.tan, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   chipText: { color: colors.ink, fontSize: 13, fontFamily: fonts.bodySemiBold },
   emptyText: { color: colors.inkFaint, fontSize: 13, fontFamily: fonts.body },
-  addPlayerRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  addPlayerRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   input: {
     flex: 1,
     backgroundColor: colors.paper,
@@ -324,9 +330,18 @@ const styles = StyleSheet.create({
   optionChipText: { color: colors.ink, fontFamily: fonts.bodySemiBold },
   optionChipTextActive: { color: colors.cream },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 4 },
+  banner: {
+    marginTop: 24,
+    backgroundColor: colors.gold,
+    color: colors.ink,
+    padding: 12,
+    borderRadius: 10,
+    fontFamily: fonts.bodySemiBold,
+    textAlign: 'center',
+  },
   startButton: {
     backgroundColor: colors.red,
-    marginTop: 32,
+    marginTop: 12,
     paddingVertical: 18,
     borderRadius: 10,
     alignItems: 'center',

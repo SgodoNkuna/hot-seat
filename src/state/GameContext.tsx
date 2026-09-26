@@ -1,7 +1,11 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GameState, Team, GameConfig } from '../engine/types';
 import { Deck } from '../engine/types';
-import { createGame } from '../engine/GameEngine';
+import { createGame, cardKey } from '../engine/GameEngine';
+
+const SEEN_KEY = 'hotseat:seen-cards';
+const SEEN_CAP = 5000;
 
 interface MatchInfo {
   matchNumber: number;
@@ -29,6 +33,21 @@ const MATCH_TARGET_WINS = 2; // best of 3
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState | null>(null);
   const [match, setMatch] = useState<MatchInfo | null>(null);
+  const seenRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SEEN_KEY)
+      .then((raw) => { if (raw) seenRef.current = JSON.parse(raw); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const key = state?.activePair ? cardKey(state.activePair) : null;
+    if (!key || seenRef.current[seenRef.current.length - 1] === key) return;
+    seenRef.current = [...seenRef.current.filter((k) => k !== key), key].slice(-SEEN_CAP);
+    AsyncStorage.setItem(SEEN_KEY, JSON.stringify(seenRef.current)).catch(() => {});
+  }, [state?.activePair]);
+
 
   const update = useCallback((fn: (s: GameState) => GameState) => {
     setState((prev) => (prev ? fn(prev) : prev));
@@ -38,7 +57,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const wins: Record<string, number> = {};
     teams.forEach((t) => (wins[t.id] = 0));
     setMatch({ matchNumber: 1, matchWins: wins, teams, config, allDecks });
-    setState(createGame(teams, config, allDecks));
+    setState(createGame(teams, config, allDecks, seenRef.current));
   }, []);
 
   const recordMatchWinAndContinue = useCallback((): 'next' | 'champion' => {
@@ -53,7 +72,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const startNextMatchGame = useCallback(() => {
     if (!match) return;
     setMatch((prev) => (prev ? { ...prev, matchNumber: prev.matchNumber + 1 } : prev));
-    setState(createGame(match.teams, match.config, match.allDecks));
+    setState(createGame(match.teams, match.config, match.allDecks, seenRef.current));
   }, [match]);
 
   const clearMatch = useCallback(() => {

@@ -70,6 +70,12 @@ wss.on('connection', (ws: WebSocket) => {
       case 'end_turn':
         if (conn.playerId) rooms.endTurnEarly(conn.playerId);
         break;
+      case 'adjust_score':
+        if (conn.playerId) rooms.adjustScore(conn.playerId, msg.delta);
+        break;
+      case 'confirm_score':
+        if (conn.playerId) rooms.confirmScore(conn.playerId);
+        break;
       case 'leave':
         if (conn.playerId) rooms.leave(conn.playerId);
         conn.playerId = null;

@@ -28,6 +28,8 @@ export type ClientMessage =
   | { type: 'flip' }
   | { type: 'next_card' }
   | { type: 'end_turn' }
+  | { type: 'adjust_score'; delta: number }
+  | { type: 'confirm_score' }
   | { type: 'leave' };
 
 // server -> client

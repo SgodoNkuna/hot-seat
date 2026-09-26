@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { Deck } from '../engine/types';
 import { DECKS } from '../data/decks';
-import { loadCustomDecks, saveCustomDecks, createCustomDeck, wordsToCards } from '../data/customDecks';
+import {
+  loadCustomDecks,
+  saveCustomDecks,
+  createCustomDeck,
+  wordsToCards,
+  encodeDeckShareCode,
+  decodeDeckShareCode,
+} from '../data/customDecks';
 import { colors, fonts } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DeckEditor'>;
@@ -16,6 +24,9 @@ export default function DeckEditorScreen({}: Props) {
   const [nameInput, setNameInput] = useState('');
   const [wordsInput, setWordsInput] = useState('');
   const [yellowWordsInput, setYellowWordsInput] = useState('');
+  const [importInput, setImportInput] = useState('');
+  const [banner, setBanner] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCustomDecks().then((decks) => {
@@ -53,12 +64,12 @@ export default function DeckEditorScreen({}: Props) {
   async function saveDeck() {
     const name = nameInput.trim();
     if (!name) {
-      Alert.alert('Name required', 'Give your deck a name.');
+      setBanner('Give your category a name first.');
       return;
     }
     const words = wordsInput.split(',').map((w) => w.trim()).filter(Boolean);
     if (words.length < 5) {
-      Alert.alert('Not enough words', 'Add at least 5 comma-separated words or names (cards are made of 5).');
+      setBanner('Add at least 5 comma-separated words — each card holds 5.');
       return;
     }
     const yellowWords = yellowWordsInput.split(',').map((w) => w.trim()).filter(Boolean);
@@ -77,17 +88,30 @@ export default function DeckEditorScreen({}: Props) {
     cancelEdit();
   }
 
+  async function shareDeck(deck: Deck) {
+    const code = encodeDeckShareCode(deck);
+    await Clipboard.setStringAsync(code);
+    setBanner(`Share code for "${deck.name}" copied — paste it to anyone so they can import it.`);
+  }
+
+  async function importDeck() {
+    const deck = decodeDeckShareCode(importInput);
+    if (!deck) {
+      setBanner('That doesn\'t look like a valid Hot Seat share code.');
+      return;
+    }
+    await persist([...customDecks, deck]);
+    setImportInput('');
+    setBanner(`Imported "${deck.name}".`);
+  }
+
   async function deleteDeck(id: string) {
-    Alert.alert('Delete deck', 'Remove this deck permanently?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await persist(customDecks.filter((d) => d.id !== id));
-        },
-      },
-    ]);
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
+    setConfirmDeleteId(null);
+    await persist(customDecks.filter((d) => d.id !== id));
   }
 
   if (loading) return null;
@@ -104,6 +128,12 @@ export default function DeckEditorScreen({}: Props) {
         ))}
       </View>
 
+      {banner && (
+        <Pressable style={styles.banner} onPress={() => setBanner(null)}>
+          <Text style={styles.bannerText}>{banner}</Text>
+        </Pressable>
+      )}
+
       <Text style={styles.heading}>YOUR CATEGORIES</Text>
       {customDecks.length === 0 && <Text style={styles.emptyText}>No custom categories yet.</Text>}
       {customDecks.map((deck) => (
@@ -112,14 +142,34 @@ export default function DeckEditorScreen({}: Props) {
             <Text style={styles.deckName}>{deck.name}</Text>
             <Text style={styles.deckMeta}>{deck.cards.length} cards</Text>
           </View>
+          <Pressable onPress={() => shareDeck(deck)} style={styles.iconButton}>
+            <Text style={styles.iconButtonText}>Share</Text>
+          </Pressable>
           <Pressable onPress={() => startEditDeck(deck)} style={styles.iconButton}>
             <Text style={styles.iconButtonText}>Edit</Text>
           </Pressable>
           <Pressable onPress={() => deleteDeck(deck.id)} style={styles.iconButton}>
-            <Text style={[styles.iconButtonText, styles.deleteText]}>Delete</Text>
+            <Text style={[styles.iconButtonText, confirmDeleteId === deck.id ? styles.confirmDeleteText : styles.deleteText]}>
+              {confirmDeleteId === deck.id ? 'Tap to confirm' : 'Delete'}
+            </Text>
           </Pressable>
         </View>
       ))}
+
+      <View style={styles.importCard}>
+        <Text style={styles.heading}>IMPORT A SHARED CATEGORY</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Paste a Hot Seat share code here"
+          placeholderTextColor={colors.inkFaint}
+          value={importInput}
+          onChangeText={setImportInput}
+          multiline
+        />
+        <Pressable style={styles.saveButton} onPress={importDeck}>
+          <Text style={styles.saveButtonText}>Import</Text>
+        </Pressable>
+      </View>
 
       {editingId ? (
         <View style={styles.editCard}>
@@ -201,6 +251,7 @@ const styles = StyleSheet.create({
   iconButton: { paddingHorizontal: 10, paddingVertical: 6 },
   iconButtonText: { color: colors.red, fontFamily: fonts.bodySemiBold, fontSize: 13 },
   deleteText: { color: colors.inkFaint },
+  confirmDeleteText: { color: colors.red },
   newDeckButton: {
     backgroundColor: 'transparent',
     borderRadius: 10,
@@ -211,6 +262,16 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   newDeckButtonText: { color: colors.ink, fontFamily: fonts.bodySemiBold },
+  banner: {
+    backgroundColor: colors.gold,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: colors.goldDark,
+  },
+  bannerText: { color: colors.ink, fontFamily: fonts.bodySemiBold, fontSize: 13 },
+  importCard: { backgroundColor: colors.paper, borderRadius: 12, padding: 16, marginTop: 20, borderWidth: 3, borderColor: colors.ink, borderStyle: 'dashed' },
   editCard: { backgroundColor: colors.paper, borderRadius: 12, padding: 16, marginTop: 8, borderWidth: 3, borderColor: colors.ink },
   input: {
     backgroundColor: colors.cream,

@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import { Deck, GameConfig, GameState, Team } from './shared/types';
-import { createGame, startTurn, tick, markCorrect, markSkip, flipCard, nextCard, endTurn } from './shared/GameEngine';
+import { createGame, startTurn, tick, markCorrect, markSkip, flipCard, nextCard, endTurn, adjustScore, confirmScore } from './shared/GameEngine';
 import { DECKS } from './shared/decks';
 import { RoomSnapshot, RoomTeam, ServerMessage } from './protocol';
 
@@ -166,6 +166,26 @@ export class RoomManager {
     if (!room?.gameState) return;
     room.gameState = endTurn(room.gameState);
     this.stopTicker(room);
+    this.broadcastGame(room);
+    if (room.gameState.winnerId) room.status = 'finished';
+  }
+
+  private isOnLastTurnTeam(room: Room, playerId: string): boolean {
+    const player = room.players.get(playerId);
+    return !player || player.teamId === room.gameState?.lastTurnTeamId;
+  }
+
+  adjustScore(playerId: string, delta: number) {
+    const room = this.getRoomByPlayer(playerId);
+    if (!room?.gameState || this.isOnLastTurnTeam(room, playerId)) return;
+    room.gameState = adjustScore(room.gameState, delta);
+    this.broadcastGame(room);
+  }
+
+  confirmScore(playerId: string) {
+    const room = this.getRoomByPlayer(playerId);
+    if (!room?.gameState || this.isOnLastTurnTeam(room, playerId)) return;
+    room.gameState = confirmScore(room.gameState);
     this.broadcastGame(room);
     if (room.gameState.winnerId) room.status = 'finished';
   }

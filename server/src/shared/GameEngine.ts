@@ -10,12 +10,19 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
-export function createGame(teams: Team[], config: GameConfig, allDecks: Deck[]): GameState {
-  const pairs = buildDeckPairs(config.deckIds, allDecks, config.mode === 'reverse');
+export function cardKey(pair: CardPair): string {
+  return pair.blue.join('|');
+}
+
+/** seenKeys: cards shown in earlier games; those go to the back so fresh cards come first. */
+export function createGame(teams: Team[], config: GameConfig, allDecks: Deck[], seenKeys: string[] = []): GameState {
+  const seen = new Set(seenKeys);
+  const shuffled = shuffle(buildDeckPairs(config.deckIds, allDecks, config.mode === 'reverse'));
+  const pairs = [...shuffled.filter((p) => !seen.has(cardKey(p))), ...shuffled.filter((p) => seen.has(cardKey(p)))];
   return {
     config,
     teams: teams.map((t) => ({ ...t, score: 0 })),
-    deck: shuffle(pairs),
+    deck: pairs,
     discard: [],
     currentTeamIndex: 0,
     activePair: null,
@@ -25,6 +32,7 @@ export function createGame(teams: Team[], config: GameConfig, allDecks: Deck[]):
     pendingIndices: [],
     completedIndices: [],
     guessedThisTurn: 0,
+    guessedWords: [],
     skippedThisTurn: 0,
     timeRemaining: config.turnSeconds,
     isTurnActive: false,
@@ -34,6 +42,11 @@ export function createGame(teams: Team[], config: GameConfig, allDecks: Deck[]):
     turnsPlayedThisRound: 0,
     suddenDeathActive: false,
     suddenDeathTurnsRemaining: 0,
+    lastTurnTeamId: null,
+    lastTurnGuessed: 0,
+    lastTurnWords: [],
+    lastTurnSkipped: 0,
+    scoreConfirmed: true,
   };
 }
 
@@ -46,16 +59,18 @@ function drawCard(state: GameState, discard: CardPair[] = state.discard): GameSt
     pool = [];
   }
   const [pair, ...rest] = deck;
-  const blue = pair?.blue ?? null;
+  const yellowFirst = !!(state.config.randomSide && pair?.yellow && Math.random() < 0.5);
+  const shown = (yellowFirst ? pair?.yellow : pair?.blue) ?? null;
+  const other = (yellowFirst ? pair?.blue : pair?.yellow) ?? null;
   return {
     ...state,
     deck: rest,
     discard: pool,
     activePair: pair ?? null,
-    currentCard: blue,
-    cardSide: 'blue',
-    currentCardOtherSide: state.config.allowFlip ? pair?.yellow ?? null : null,
-    pendingIndices: blue ? blue.map((_, i) => i) : [],
+    currentCard: shown,
+    cardSide: yellowFirst ? 'yellow' : 'blue',
+    currentCardOtherSide: state.config.allowFlip ? other : null,
+    pendingIndices: shown ? shown.map((_, i) => i) : [],
     completedIndices: [],
   };
 }
@@ -65,6 +80,7 @@ export function startTurn(state: GameState): GameState {
   return {
     ...withCard,
     guessedThisTurn: 0,
+    guessedWords: [],
     skippedThisTurn: 0,
     timeRemaining: state.config.turnSeconds,
     isTurnActive: true,
@@ -88,7 +104,8 @@ export function markCorrect(state: GameState): GameState {
     i === state.currentTeamIndex ? { ...t, score: t.score + 1 } : t
   );
   const completedIndices = [...state.completedIndices, idx];
-  const base = { ...state, teams, completedIndices, guessedThisTurn: state.guessedThisTurn + 1 };
+  const guessedWords = [...state.guessedWords, state.currentCard[idx]];
+  const base = { ...state, teams, completedIndices, guessedWords, guessedThisTurn: state.guessedThisTurn + 1 };
 
   if (restPending.length > 0) {
     return { ...base, pendingIndices: restPending };
@@ -197,6 +214,11 @@ export function endTurn(state: GameState): GameState {
     pendingIndices: [],
     completedIndices: [],
     discard,
+    lastTurnTeamId: state.teams[state.currentTeamIndex].id,
+    lastTurnGuessed: state.guessedThisTurn,
+    lastTurnWords: state.guessedWords,
+    lastTurnSkipped: state.skippedThisTurn,
+    scoreConfirmed: false,
   };
 
   if (next.config.mode === 'elimination') {
@@ -248,15 +270,34 @@ export function endTurn(state: GameState): GameState {
     };
   }
 
-  // classic, blitz, themed, reverse
-  const winner = classicWinner(next);
+  // classic, blitz, themed, reverse — winner is determined once the score is confirmed (see confirmScore)
   const nextIndex = (next.currentTeamIndex + 1) % next.teams.length;
   return {
     ...next,
     currentTeamIndex: nextIndex,
     round: nextIndex === 0 ? next.round + 1 : next.round,
-    winnerId: winner ? winner.id : null,
+    winnerId: null,
   };
+}
+
+/** Lets the non-playing team correct the just-finished team's score before play continues. */
+export function adjustScore(state: GameState, delta: number): GameState {
+  if (state.scoreConfirmed || !state.lastTurnTeamId) return state;
+  const teams = state.teams.map((t) =>
+    t.id === state.lastTurnTeamId ? { ...t, score: Math.max(0, t.score + delta) } : t
+  );
+  return { ...state, teams, lastTurnGuessed: Math.max(0, state.lastTurnGuessed + delta) };
+}
+
+/** Locks in the just-finished team's score and, for score-target modes, checks for a winner. */
+export function confirmScore(state: GameState): GameState {
+  if (state.scoreConfirmed) return state;
+  let winnerId = state.winnerId;
+  if (!winnerId && ['classic', 'blitz', 'themed', 'reverse', 'board'].includes(state.config.mode)) {
+    const winner = classicWinner(state);
+    if (winner) winnerId = winner.id;
+  }
+  return { ...state, scoreConfirmed: true, winnerId };
 }
 
 export function getCurrentTeam(state: GameState): Team {
