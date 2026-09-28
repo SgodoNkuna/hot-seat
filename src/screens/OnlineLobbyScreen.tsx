@@ -6,6 +6,8 @@ import { useOnline } from '../online/OnlineContext';
 import { GameMode } from '../engine/types';
 import { colors, fonts } from '../theme';
 import { useHomeIfMissing } from '../navigation/guards';
+import QRCode from 'react-native-qrcode-svg';
+import { PUBLIC_URL } from '../config';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlineLobby'>;
 
@@ -51,7 +53,10 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
       )}
       <Text style={styles.codeLabel}>Room Code</Text>
       <Text style={styles.code}>{room.code}</Text>
-      <Text style={styles.hint}>Share this code so others can join.</Text>
+      <View style={styles.qrBox}>
+        <QRCode value={`${PUBLIC_URL}online?code=${room.code}`} size={148} color={colors.ink} backgroundColor={colors.paper} />
+      </View>
+      <Text style={styles.hint}>Friends can scan this, or type the code under Join Online.</Text>
 
       <Text style={styles.heading}>Teams</Text>
       {room.teams.map((team) => (
@@ -176,6 +181,7 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  qrBox: { backgroundColor: colors.paper, padding: 12, borderRadius: 12, marginTop: 14, borderWidth: 3, borderColor: colors.ink },
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 20, paddingBottom: 60, alignItems: 'center' },
   errorBanner: { width: '100%', backgroundColor: colors.gold, borderRadius: 10, padding: 12, marginBottom: 8 },

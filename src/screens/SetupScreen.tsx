@@ -38,7 +38,7 @@ export default function SetupScreen({ navigation }: Props) {
   const [banner, setBanner] = useState<string | null>(null);
   const [matchFormat, setMatchFormat] = useState<MatchFormat>('single');
   const [customDecks, setCustomDecks] = useState<Deck[]>([]);
-  const [selectedDecks, setSelectedDecks] = useState<string[]>(DECKS.map((d) => d.id));
+  const [selectedDecks, setSelectedDecks] = useState<string[]>(DECKS.filter((d) => !d.id.startsWith('lang-')).map((d) => d.id));
 
   useEffect(() => {
     loadCustomDecks().then(setCustomDecks);

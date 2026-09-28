@@ -1,0 +1,64 @@
+name: Build Android APK
+
+# Builds an installable APK on every push to main and publishes it to the
+# "apk-latest" release, so this link always serves the newest build:
+# https://github.com/SgodoNkuna/hot-seat/releases/download/apk-latest/hot-seat.apk
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_SERVER_URL: ${{ vars.SERVER_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: npm ci
+
+      # generate the native Android project from app.json
+      - run: npx expo prebuild --platform android --no-install
+
+      # release build signed with the template's debug key: fine for sharing/sideloading, not for the Play Store
+      - name: Gradle assembleRelease
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - run: cp android/app/build/outputs/apk/release/app-release.apk hot-seat.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hot-seat-apk
+          path: hot-seat.apk
+
+      - name: Publish to the apk-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Latest Android build of Hot Seat (BETA) from commit ${GITHUB_SHA::7}.
+          Install: open this link on an Android phone, download hot-seat.apk, and allow installing from this source when asked."
+          if gh release view apk-latest >/dev/null 2>&1; then
+            gh release edit apk-latest --notes "$NOTES"
+          else
+            gh release create apk-latest --title "Hot Seat Android (latest)" --notes "$NOTES" --prerelease --target main
+          fi
+          gh release upload apk-latest hot-seat.apk --clobber

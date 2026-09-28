@@ -12,14 +12,15 @@ import { DEFAULT_SERVER_URL } from '../config';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlineHome'>;
 
-export default function OnlineHomeScreen({ navigation }: Props) {
+export default function OnlineHomeScreen({ navigation, route }: Props) {
   const { connectAndCreate, connectAndJoin, status, room, error, clearError, savedSession, rejoin } = useOnline();
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
   const [showServerField, setShowServerField] = useState(false);
   const [playerName, setPlayerName] = useState('');
-  const [roomCode, setRoomCode] = useState('');
+  // a scanned QR link arrives as /online?code=ABCD
+  const [roomCode, setRoomCode] = useState((route.params?.code ?? '').toUpperCase());
   const [customDecks, setCustomDecks] = useState<Deck[]>([]);
-  const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>(DECKS.map((d) => d.id));
+  const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>(DECKS.filter((d) => !d.id.startsWith('lang-')).map((d) => d.id));
   const [banner, setBanner] = useState<string | null>(null);
 
   useEffect(() => {

@@ -16,10 +16,16 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.sgodonkuna.hotseat",
+      "versionCode": 1
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Hot Seat",
+      "shortName": "Hot Seat",
+      "themeColor": "#3A2318",
+      "backgroundColor": "#3A2318"
     },
     "plugins": [
       "expo-font"

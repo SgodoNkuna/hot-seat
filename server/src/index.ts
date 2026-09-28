@@ -1,3 +1,4 @@
+import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { RoomManager } from './RoomManager';
 import { ClientMessage, ServerMessage } from './protocol';
@@ -5,7 +6,13 @@ import { ClientMessage, ServerMessage } from './protocol';
 const PORT = Number(process.env.PORT) || 4000;
 const rooms = new RoomManager();
 
-const wss = new WebSocketServer({ port: PORT });
+// plain HTTP answers health checks (and shows the server is awake); game traffic upgrades to WebSocket
+const http = createServer((_req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Hot Seat server OK');
+});
+const wss = new WebSocketServer({ server: http });
+http.listen(PORT);
 
 interface ConnState {
   playerId: string | null;

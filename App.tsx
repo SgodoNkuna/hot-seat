@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { WEB_BASE } from './src/config';
 import { useFonts, AlfaSlabOne_400Regular } from '@expo-google-fonts/alfa-slab-one';
 import { Fraunces_400Regular, Fraunces_600SemiBold } from '@expo-google-fonts/fraunces';
 import { GameProvider } from './src/state/GameContext';
@@ -25,15 +26,15 @@ const linking = {
   prefixes: [],
   config: {
     screens: {
-      Home: '',
-      Setup: 'setup',
-      Play: 'play',
-      Win: 'win',
-      DeckEditor: 'categories',
-      OnlineHome: 'online',
-      OnlineLobby: 'lobby',
-      OnlinePlay: 'online-play',
-      OnlineWin: 'online-win',
+      Home: WEB_BASE.slice(0, -1),
+      Setup: WEB_BASE + 'setup',
+      Play: WEB_BASE + 'play',
+      Win: WEB_BASE + 'win',
+      DeckEditor: WEB_BASE + 'categories',
+      OnlineHome: WEB_BASE + 'online',
+      OnlineLobby: WEB_BASE + 'lobby',
+      OnlinePlay: WEB_BASE + 'online-play',
+      OnlineWin: WEB_BASE + 'online-win',
     },
   },
 };

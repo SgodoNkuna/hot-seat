@@ -28,14 +28,21 @@ jobs:
       - run: npm ci
 
       - run: npx expo export --platform web
+        env:
+          # online game server address, set in repo Settings → Variables → SERVER_URL
+          EXPO_PUBLIC_SERVER_URL: ${{ vars.SERVER_URL }}
 
       # GitHub Pages project sites serve from /<repo>/, but Expo's web export
-      # hardcodes root-absolute paths ("/_expo/...", "/favicon.ico"). Rewrite
-      # them to relative so the build works from any subpath.
-      - name: Rewrite absolute asset paths to relative
+      # hardcodes root-absolute paths ("/_expo/...", "/manifest.json"). Prefix them
+      # with /hot-seat so they resolve from nested screen URLs like /hot-seat/setup.
+      - name: Prefix asset paths with the Pages sub-path
         run: |
-          sed -i 's#"/_expo/#"./_expo/#g; s#href="/favicon.ico"#href="./favicon.ico"#g' dist/index.html
-          find dist/_expo -name '*.js' -exec sed -i 's#"/assets/#"./assets/#g' {} +
+          sed -i 's#"/_expo/#"/hot-seat/_expo/#g; s#href="/#href="/hot-seat/#g' dist/index.html
+          find dist/_expo -name '*.js' -exec sed -i 's#"/assets/#"/hot-seat/assets/#g' {} +
+
+      # Pages has no SPA fallback: serve the app for any unknown path so a refreshed
+      # or shared screen URL (e.g. a QR join link) still loads.
+      - run: cp dist/index.html dist/404.html
 
       - uses: actions/upload-pages-artifact@v3
         with:

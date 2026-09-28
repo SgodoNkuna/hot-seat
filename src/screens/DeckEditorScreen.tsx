@@ -14,6 +14,7 @@ import {
   decodeDeckShareCode,
 } from '../data/customDecks';
 import { colors, fonts } from '../theme';
+import { loadFlags, clearFlags } from '../data/flags';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DeckEditor'>;
 
@@ -26,6 +27,22 @@ export default function DeckEditorScreen({}: Props) {
   const [yellowWordsInput, setYellowWordsInput] = useState('');
   const [importInput, setImportInput] = useState('');
   const [banner, setBanner] = useState<string | null>(null);
+  const [flags, setFlags] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadFlags().then(setFlags);
+  }, []);
+
+  async function copyFlags() {
+    await Clipboard.setStringAsync('Hot Seat flagged cards:\n' + flags.map((w) => '- ' + w).join('\n'));
+    setBanner('Flagged list copied — paste it into a message to the game maker.');
+  }
+
+  async function resetFlags() {
+    await clearFlags();
+    setFlags([]);
+    setBanner('Flags cleared. Those cards can come up again.');
+  }
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -134,6 +151,22 @@ export default function DeckEditorScreen({}: Props) {
         </Pressable>
       )}
 
+      {flags.length > 0 && (
+        <View style={styles.flagCard}>
+          <Text style={styles.heading}>FLAGGED CARDS ({flags.length})</Text>
+          <Text style={styles.flagWords}>{flags.join(' · ')}</Text>
+          <Text style={styles.hintText}>Cards with these words are skipped on this device.</Text>
+          <View style={styles.editActionsRow}>
+            <Pressable style={styles.saveButton} onPress={copyFlags}>
+              <Text style={styles.saveButtonText}>Copy list</Text>
+            </Pressable>
+            <Pressable style={styles.cancelButton} onPress={resetFlags}>
+              <Text style={styles.cancelButtonText}>Clear flags</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       <Text style={styles.heading}>YOUR CATEGORIES</Text>
       {customDecks.length === 0 && <Text style={styles.emptyText}>No custom categories yet.</Text>}
       {customDecks.map((deck) => (
@@ -219,6 +252,8 @@ export default function DeckEditorScreen({}: Props) {
 }
 
 const styles = StyleSheet.create({
+  flagCard: { backgroundColor: colors.paper, borderRadius: 12, padding: 16, marginTop: 8, borderWidth: 3, borderColor: colors.red },
+  flagWords: { fontFamily: fonts.bodySemiBold, color: colors.ink, fontSize: 14, marginBottom: 6 },
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 20, paddingBottom: 60 },
   heading: { fontFamily: fonts.display, fontSize: 12, letterSpacing: 1.5, color: colors.ink, marginTop: 20, marginBottom: 12 },

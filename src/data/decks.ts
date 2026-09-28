@@ -3,6 +3,7 @@ import { MORE } from './moreCards';
 import { EXTRA } from './extraCards';
 import { SA_MORE } from './saCards';
 import { BATCH4 } from './batch4Cards';
+import { LANG_DECKS } from './langCards';
 
 function chunkIntoCards(words: string[]): string[][] {
   const cards: string[][] = [];
@@ -310,6 +311,7 @@ export const DECKS: Deck[] = [
   { id: 'geography', name: 'Geography', cards: chunkIntoCards([...geography.slice(0, pairLen(geography, geographyYellow)), ...MORE.geography.blue, ...EXTRA.geography.blue, ...BATCH4.geography.blue]), cardsYellow: chunkIntoCards([...geographyYellow.slice(0, pairLen(geography, geographyYellow)), ...MORE.geography.yellow, ...EXTRA.geography.yellow, ...BATCH4.geography.yellow]) },
   { id: 'entertainment', name: 'Entertainment', cards: chunkIntoCards([...entertainment.slice(0, pairLen(entertainment, entertainmentYellow)), ...MORE.entertainment.blue, ...EXTRA.entertainment.blue, ...BATCH4.entertainment.blue]), cardsYellow: chunkIntoCards([...entertainmentYellow.slice(0, pairLen(entertainment, entertainmentYellow)), ...MORE.entertainment.yellow, ...EXTRA.entertainment.yellow, ...BATCH4.entertainment.yellow]) },
   { id: 'sa-trending', name: 'SA Trending', cards: chunkIntoCards([...saTrending, ...SA_MORE.blue]), cardsYellow: chunkIntoCards([...saTrendingYellow, ...SA_MORE.yellow]) },
+  ...Object.entries(LANG_DECKS).map(([id, d]) => ({ id: 'lang-' + id, name: d.name, cards: chunkIntoCards(d.blue), cardsYellow: chunkIntoCards(d.yellow) })),
 ];
 
 export function getDeckById(id: string, allDecks: Deck[] = DECKS): Deck | undefined {

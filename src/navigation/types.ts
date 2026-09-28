@@ -4,7 +4,7 @@ export type RootStackParamList = {
   Play: undefined;
   Win: undefined;
   DeckEditor: undefined;
-  OnlineHome: undefined;
+  OnlineHome: { code?: string } | undefined;
   OnlineLobby: undefined;
   OnlinePlay: undefined;
   OnlineWin: undefined;
