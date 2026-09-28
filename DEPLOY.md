@@ -6,15 +6,14 @@ Two pieces, deployed separately: the WebSocket game server, and the app itself.
 
 Free host: [Render](https://render.com) (or Fly.io — same idea, different UI).
 
-1. Push this repo to GitHub.
-2. On Render: New → Blueprint → point at the repo. It reads `server/render.yaml` automatically.
-3. Deploy. Render gives you a URL like `hot-seat-server.onrender.com`.
-4. Edit one line in [src/config.ts](src/config.ts):
-   ```ts
-   export const DEFAULT_SERVER_URL = 'wss://hot-seat-server.onrender.com';
+1. On Render: New → Blueprint → pick this repo. It reads the root `render.yaml` automatically.
+2. Deploy. Render gives you a URL like `hot-seat-server.onrender.com`. Opening it in a browser should say "Hot Seat server OK".
+3. Tell the builds where it is (no code change needed):
+   ```bash
+   gh variable set SERVER_URL --repo SgodoNkuna/hot-seat --body "wss://hot-seat-server.onrender.com"
    ```
    (`wss://` not `ws://` — Render terminates TLS for you.)
-5. Rebuild/redeploy the app (step 2 below). Every player now gets this URL by default — no one has to type an IP again.
+4. Re-run the two GitHub Actions workflows (or push any commit). The website and the APK now connect to your server by default.
 
 Free-tier Render services sleep after 15 min idle; first connection after a sleep takes ~30s to wake up. Fine for a party game, worth knowing.
 
@@ -26,13 +25,10 @@ npx expo export --platform web
 ```
 This produces a static `dist/` folder (already generated once, ~2.5MB). Drag that folder onto [Netlify Drop](https://app.netlify.com/drop) — no account needed for a one-off, free account for a stable URL. Done: anyone with the link plays immediately, phone or laptop, local pass-and-play works with zero setup, online works once step 1 is done.
 
-**Android (installable APK, no Play Store review needed for v1):**
-```bash
-npm install -g eas-cli
-eas login          # free Expo account
-eas build -p android --profile preview
-```
-`eas build` needs an `eas.json` — run `eas build:configure` first if one doesn't exist yet. Produces a downloadable `.apk` link to share directly; skips app-store review entirely.
+**Android APK (automatic):** the `Build Android APK` GitHub Action builds on every push to `main` and publishes to a fixed link:
+https://github.com/SgodoNkuna/hot-seat/releases/download/apk-latest/hot-seat.apk
+
+It's signed with a debug key, which is fine for sharing and sideloading but not for the Play Store. Because the key can change between builds, people may need to uninstall the old version before installing a newer APK.
 
 **iOS:** needs an Apple Developer account ($99/yr) either way — `eas build -p ios` once that exists. Not free, no way around it; hold off until the game is validated.
 
