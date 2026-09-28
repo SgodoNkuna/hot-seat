@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch, TextInput } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useOnline } from '../online/OnlineContext';
 import { GameMode } from '../engine/types';
 import { colors, fonts } from '../theme';
+import { useHomeIfMissing } from '../navigation/guards';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlineLobby'>;
 
@@ -21,7 +22,7 @@ const MODE_OPTIONS: { id: GameMode; label: string }[] = [
 ];
 
 export default function OnlineLobbyScreen({ navigation }: Props) {
-  const { room, playerId, gameState, setTeam, addTeam, updateConfig, startGame, leaveAndDisconnect, error, clearError } =
+  const { room, playerId, gameState, setTeam, addTeam, updateConfig, renameTeam, startGame, leaveAndDisconnect, error, clearError } =
     useOnline();
 
   const isHost = room?.hostPlayerId === playerId;
@@ -31,6 +32,8 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
       navigation.navigate('OnlinePlay');
     }
   }, [room?.status, gameState]);
+
+  useHomeIfMissing(navigation, !room);
 
   if (!room) return null;
 
@@ -53,7 +56,18 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
       <Text style={styles.heading}>Teams</Text>
       {room.teams.map((team) => (
         <View key={team.id} style={styles.teamCard}>
-          <Text style={styles.teamName}>{team.name}</Text>
+          {isHost ? (
+            <TextInput
+              key={team.id + team.name}
+              style={styles.teamNameInput}
+              defaultValue={team.name}
+              onEndEditing={(e) => renameTeam(team.id, e.nativeEvent.text)}
+              onSubmitEditing={(e) => renameTeam(team.id, e.nativeEvent.text)}
+              maxLength={24}
+            />
+          ) : (
+            <Text style={styles.teamName}>{team.name}</Text>
+          )}
           {team.players.length === 0 && <Text style={styles.emptyText}>No players</Text>}
           {team.players.map((p) => (
             <Text key={p.id} style={styles.playerLine}>
@@ -183,6 +197,7 @@ const styles = StyleSheet.create({
   heading: { fontFamily: fonts.display, fontSize: 12, letterSpacing: 1.5, color: colors.ink, marginTop: 20, marginBottom: 10, alignSelf: 'flex-start' },
   teamCard: { backgroundColor: colors.paper, borderRadius: 12, padding: 14, marginBottom: 10, width: '100%', borderWidth: 3, borderColor: colors.ink, borderBottomWidth: 6 },
   teamName: { fontFamily: fonts.display, fontSize: 13, color: colors.red, marginBottom: 6 },
+  teamNameInput: { fontFamily: fonts.display, fontSize: 14, color: colors.red, marginBottom: 6, paddingVertical: 4, borderBottomWidth: 2, borderBottomColor: colors.border },
   emptyText: { color: colors.inkFaint, fontSize: 13, marginBottom: 6, fontFamily: fonts.body },
   playerLine: { color: colors.ink, fontSize: 14, marginVertical: 2, fontFamily: fonts.body },
   joinTeamButton: { marginTop: 8, backgroundColor: colors.tan, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },

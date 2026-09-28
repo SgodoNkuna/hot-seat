@@ -76,6 +76,26 @@ wss.on('connection', (ws: WebSocket) => {
       case 'confirm_score':
         if (conn.playerId) rooms.confirmScore(conn.playerId);
         break;
+      case 'undo':
+        if (conn.playerId) rooms.undo(conn.playerId);
+        break;
+      case 'pause':
+        if (conn.playerId) rooms.pause(conn.playerId, msg.paused);
+        break;
+      case 'rename_team':
+        if (conn.playerId) rooms.renameTeam(conn.playerId, msg.teamId, msg.name);
+        break;
+      case 'rejoin': {
+        const result = rooms.rejoin(ws, msg.roomCode, msg.playerId);
+        if ('error' in result) {
+          send(ws, { type: 'error', message: result.error });
+          return;
+        }
+        conn.playerId = msg.playerId;
+        send(ws, { type: 'joined', playerId: msg.playerId, room: rooms.snapshot(result.room) });
+        rooms.sendGameTo(msg.playerId);
+        break;
+      }
       case 'leave':
         if (conn.playerId) rooms.leave(conn.playerId);
         conn.playerId = null;
@@ -84,7 +104,7 @@ wss.on('connection', (ws: WebSocket) => {
   });
 
   ws.on('close', () => {
-    if (conn.playerId) rooms.leave(conn.playerId);
+    if (conn.playerId) rooms.disconnect(conn.playerId);
   });
 });
 

@@ -1,47 +1,43 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from 'react-native';
-import { Audio } from 'expo-av';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useOnline } from '../online/OnlineContext';
 import CountdownRing from '../components/CountdownRing';
 import BoardMap from '../components/BoardMap';
+import { currentDescriber } from '../engine/GameEngine';
+import { useGameSounds } from '../useGameSounds';
+import { useHomeIfMissing, useConfirmLeave } from '../navigation/guards';
 import { colors, fonts } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlinePlay'>;
 
 export default function OnlinePlayScreen({ navigation }: Props) {
-  const { gameState, room, playerId, startTurn, correct, skip, flip, nextCard, endTurn, adjustScore, confirmScore } =
-    useOnline();
-  const buzzerRef = useRef<Audio.Sound | null>(null);
+  const {
+    gameState, room, playerId, startTurn, correct, skip, flip, nextCard, endTurn, adjustScore, confirmScore, undo, pause, reconnecting,
+  } = useOnline();
+  const [countdown, setCountdown] = useState<number | null>(null);
+  useGameSounds(gameState);
+  useHomeIfMissing(navigation, !gameState || !room);
+  useConfirmLeave(navigation, !!gameState && !gameState.winnerId);
 
+  // 3-2-1 on the describer's phone, then start the shared clock
   useEffect(() => {
-    return () => {
-      buzzerRef.current?.unloadAsync();
-    };
-  }, []);
+    if (countdown === null) return;
+    if (countdown === 0) {
+      setCountdown(null);
+      startTurn();
+      return;
+    }
+    const t = setTimeout(() => setCountdown(countdown - 1), 800);
+    return () => clearTimeout(t);
+  }, [countdown]);
 
   useEffect(() => {
     if (gameState?.winnerId && gameState.scoreConfirmed) {
       navigation.replace('OnlineWin');
     }
   }, [gameState?.winnerId, gameState?.scoreConfirmed]);
-
-  useEffect(() => {
-    if (gameState?.timeRemaining === 0 && !gameState.isTurnActive) {
-      playBuzzer();
-    }
-  }, [gameState?.timeRemaining, gameState?.isTurnActive]);
-
-  async function playBuzzer() {
-    try {
-      const { sound } = await Audio.Sound.createAsync(require('../../assets/buzzer.wav'));
-      buzzerRef.current = sound;
-      await sound.playAsync();
-    } catch {
-      // sound is best-effort; ignore failures (e.g. audio permissions denied)
-    }
-  }
 
   const { height } = useWindowDimensions();
   const compact = height < 760;
@@ -54,6 +50,22 @@ export default function OnlinePlayScreen({ navigation }: Props) {
   const cardWords = gameState.currentCard ?? [];
   const sideComplete = gameState.isTurnActive && gameState.currentCard !== null && gameState.pendingIndices.length === 0;
   const canFlip = sideComplete && gameState.config.allowFlip && !!gameState.currentCardOtherSide;
+  const describer = currentDescriber(gameState, currentTeam.id);
+  const myName = myTeam?.players.find((p) => p.id === playerId)?.name;
+  // on the guessing team only the describer sees the card; everyone else guesses
+  const isDescriber = isMyTurn && (!describer || myName === describer);
+  const canSeeWords = !isMyTurn || isDescriber;
+
+  const reconnectBanner = reconnecting ? <Text style={styles.reconnectBanner}>Reconnecting…</Text> : null;
+
+  if (countdown !== null) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.teamLabel}>{describer ? `${describer}, get ready` : 'Get ready'}</Text>
+        <Text style={styles.countdownNum}>{countdown}</Text>
+      </View>
+    );
+  }
 
   if (!gameState.isTurnActive && gameState.lastTurnTeamId && !gameState.scoreConfirmed) {
     const lastTeam = gameState.teams.find((t) => t.id === gameState.lastTurnTeamId);
@@ -111,6 +123,7 @@ export default function OnlinePlayScreen({ navigation }: Props) {
         <View style={styles.turnCard}>
           <Text style={styles.upNextLabel}>Up Next</Text>
           <Text style={styles.teamNameBig}>{currentTeam.name}</Text>
+          {describer && <Text style={styles.describerText}>{describer} describes</Text>}
           <Text style={styles.roundLabel}>Round {gameState.round}</Text>
           {gameState.suddenDeathActive && (
             <Text style={styles.suddenDeathBadge}>⚡ Sudden Death — final round!</Text>
@@ -132,12 +145,15 @@ export default function OnlinePlayScreen({ navigation }: Props) {
             })}
           </View>
 
-          {isMyTurn ? (
-            <Pressable style={styles.startButton} onPress={startTurn}>
+          {reconnectBanner}
+          {isDescriber ? (
+            <Pressable style={styles.startButton} onPress={() => setCountdown(3)}>
               <Text style={styles.startButtonText}>Start 30 Seconds</Text>
             </Pressable>
           ) : (
-            <Text style={styles.waitingText}>Waiting for {currentTeam.name} to start their turn…</Text>
+            <Text style={styles.waitingText}>
+              Waiting for {describer ?? currentTeam.name} to start{isMyTurn ? ' — get ready to guess!' : '…'}
+            </Text>
           )}
         </View>
       </ScrollView>
@@ -146,10 +162,31 @@ export default function OnlinePlayScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.teamLabel}>{currentTeam.name}'s Turn</Text>
+      {reconnectBanner}
+      <View style={styles.topBar}>
+        <Text style={styles.teamLabel}>
+          {currentTeam.name}
+          {describer ? ` · ${describer} describing` : "'s Turn"}
+        </Text>
+        {isDescriber && (
+          <Pressable style={styles.pauseButton} onPress={() => pause(!gameState.isPaused)}>
+            <Text style={styles.pauseButtonText}>{gameState.isPaused ? 'RESUME' : 'PAUSE'}</Text>
+          </Pressable>
+        )}
+      </View>
 
       <CountdownRing totalSeconds={gameState.config.turnSeconds} timeRemaining={gameState.timeRemaining} size={compact ? 120 : 184} />
 
+      {gameState.isPaused || !canSeeWords ? (
+        <View style={[styles.wordCard, styles.pausedCard]}>
+          <Text style={styles.pausedTitle}>{gameState.isPaused ? 'PAUSED' : 'GUESS!'}</Text>
+          <Text style={styles.pausedHint}>
+            {gameState.isPaused
+              ? 'Words hidden until the describer resumes.'
+              : `${describer ?? 'Your teammate'} is describing — shout your answers!`}
+          </Text>
+        </View>
+      ) : (
       <View
         style={[
           styles.wordCard,
@@ -172,8 +209,9 @@ export default function OnlinePlayScreen({ navigation }: Props) {
           );
         })}
       </View>
+      )}
 
-      {isMyTurn ? (
+      {isDescriber && !gameState.isPaused ? (
         <>
           {sideComplete ? (
             <View style={styles.sideCompleteRow}>
@@ -203,12 +241,19 @@ export default function OnlinePlayScreen({ navigation }: Props) {
               </Pressable>
             </View>
           )}
-          <Pressable style={styles.endEarlyLink} onPress={endTurn}>
-            <Text style={styles.endEarlyText}>End turn early</Text>
-          </Pressable>
+          <View style={styles.bottomLinks}>
+            {gameState.undo && (
+              <Pressable style={styles.endEarlyLink} onPress={undo}>
+                <Text style={styles.undoText}>↶ Undo last tap</Text>
+              </Pressable>
+            )}
+            <Pressable style={styles.endEarlyLink} onPress={endTurn}>
+              <Text style={styles.endEarlyText}>End turn early</Text>
+            </Pressable>
+          </View>
         </>
       ) : (
-        <Text style={styles.waitingText}>{currentTeam.name} is guessing…</Text>
+        !isMyTurn && <Text style={styles.waitingText}>{currentTeam.name} is guessing…</Text>
       )}
     </View>
   );
@@ -219,7 +264,18 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   hidden: { display: 'none' },
   container: { flex: 1, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  teamLabel: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: colors.gold, marginBottom: 22 },
+  teamLabel: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: colors.gold, flexShrink: 1 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 18, gap: 10 },
+  pauseButton: { borderWidth: 2, borderColor: colors.gold, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  pauseButtonText: { fontFamily: fonts.display, fontSize: 11, color: colors.gold, letterSpacing: 1 },
+  pausedCard: { paddingVertical: 48 },
+  pausedTitle: { fontFamily: fonts.display, fontSize: 28, color: colors.ink },
+  pausedHint: { fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft, marginTop: 8, textAlign: 'center' },
+  bottomLinks: { flexDirection: 'row', gap: 24, alignItems: 'center' },
+  undoText: { color: colors.gold, fontSize: 13, letterSpacing: 1, fontFamily: fonts.bodySemiBold },
+  countdownNum: { fontFamily: fonts.display, fontSize: 120, color: colors.cream, marginTop: 24 },
+  describerText: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.red, marginBottom: 4 },
+  reconnectBanner: { backgroundColor: colors.gold, color: colors.ink, fontFamily: fonts.bodySemiBold, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, marginBottom: 12, overflow: 'hidden' },
   wordCard: {
     backgroundColor: colors.paper,
     borderRadius: 14,

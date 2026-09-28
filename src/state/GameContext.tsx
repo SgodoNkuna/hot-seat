@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GameState, Team, GameConfig } from '../engine/types';
 import { Deck } from '../engine/types';
 import { createGame, cardKey } from '../engine/GameEngine';
+import { loadFlags } from '../data/flags';
 
 const SEEN_KEY = 'hotseat:seen-cards';
 const SEEN_CAP = 5000;
@@ -24,6 +25,7 @@ interface GameContextValue {
   recordMatchWinAndContinue: () => 'next' | 'champion';
   startNextMatchGame: () => void;
   clearMatch: () => void;
+  setFlags: (words: string[]) => void;
 }
 
 const GameContext = createContext<GameContextValue | undefined>(undefined);
@@ -34,8 +36,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState | null>(null);
   const [match, setMatch] = useState<MatchInfo | null>(null);
   const seenRef = useRef<string[]>([]);
+  const flagsRef = useRef<string[]>([]);
+
+  // re-read flags whenever a game starts so newly flagged cards are dropped
+  const refreshFlags = () => loadFlags().then((f) => (flagsRef.current = f));
 
   useEffect(() => {
+    refreshFlags();
     AsyncStorage.getItem(SEEN_KEY)
       .then((raw) => { if (raw) seenRef.current = JSON.parse(raw); })
       .catch(() => {});
@@ -54,10 +61,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const beginMatch = useCallback((teams: Team[], config: GameConfig, allDecks: Deck[]) => {
+    refreshFlags();
     const wins: Record<string, number> = {};
     teams.forEach((t) => (wins[t.id] = 0));
     setMatch({ matchNumber: 1, matchWins: wins, teams, config, allDecks });
-    setState(createGame(teams, config, allDecks, seenRef.current));
+    setState(createGame(teams, config, allDecks, seenRef.current, flagsRef.current));
   }, []);
 
   const recordMatchWinAndContinue = useCallback((): 'next' | 'champion' => {
@@ -72,7 +80,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const startNextMatchGame = useCallback(() => {
     if (!match) return;
     setMatch((prev) => (prev ? { ...prev, matchNumber: prev.matchNumber + 1 } : prev));
-    setState(createGame(match.teams, match.config, match.allDecks, seenRef.current));
+    setState(createGame(match.teams, match.config, match.allDecks, seenRef.current, flagsRef.current));
   }, [match]);
 
   const clearMatch = useCallback(() => {
@@ -91,6 +99,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         recordMatchWinAndContinue,
         startNextMatchGame,
         clearMatch,
+        setFlags: (words: string[]) => (flagsRef.current = words),
       }}
     >
       {children}

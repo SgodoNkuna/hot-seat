@@ -143,7 +143,19 @@ export default function SetupScreen({ navigation }: Props) {
       {teams.map((team, index) => (
         <View key={team.id} style={styles.teamCard}>
           <View style={styles.teamHeaderRow}>
-            <Text style={styles.teamName}>{team.name}</Text>
+            <TextInput
+              style={styles.teamNameInput}
+              value={team.name}
+              onChangeText={(name) => setTeams((prev) => prev.map((t) => (t.id === team.id ? { ...t, name } : t)))}
+              onBlur={() =>
+                setTeams((prev) =>
+                  prev.map((t, i) => (t.id === team.id && !t.name.trim() ? { ...t, name: `Team ${i + 1}` } : t))
+                )
+              }
+              maxLength={24}
+              placeholder="Team name"
+              placeholderTextColor={colors.inkFaint}
+            />
             {teams.length > 2 && (
               <Pressable onPress={() => removeTeam(index)}>
                 <Text style={styles.removeText}>Remove</Text>
@@ -166,7 +178,8 @@ export default function SetupScreen({ navigation }: Props) {
               value={playerInputs[team.id] ?? ''}
               onChangeText={(text) => setPlayerInputs((prev) => ({ ...prev, [team.id]: text }))}
               onSubmitEditing={() => addPlayer(team.id)}
-              returnKeyType="done"
+              submitBehavior="submit"
+              returnKeyType="next"
             />
             <Pressable style={styles.smallButton} onPress={() => addPlayer(team.id)}>
               <Text style={styles.smallButtonText}>+ Add</Text>
@@ -288,7 +301,16 @@ const styles = StyleSheet.create({
   blurbText: { color: colors.inkSoft, fontSize: 13, marginTop: 4, fontFamily: fonts.body },
   teamCard: { backgroundColor: colors.paper, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 3, borderColor: colors.ink, borderBottomWidth: 6 },
   teamHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  teamName: { fontFamily: fonts.display, fontSize: 13, color: colors.red },
+  teamNameInput: {
+    flex: 1,
+    fontFamily: fonts.display,
+    fontSize: 14,
+    color: colors.red,
+    paddingVertical: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.border,
+    marginRight: 12,
+  },
   removeText: { color: colors.red, fontSize: 13, fontFamily: fonts.bodySemiBold },
   playerChipRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 8 },
   chip: { backgroundColor: colors.tan, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },

@@ -30,6 +30,10 @@ export type ClientMessage =
   | { type: 'end_turn' }
   | { type: 'adjust_score'; delta: number }
   | { type: 'confirm_score' }
+  | { type: 'undo' }
+  | { type: 'pause'; paused: boolean }
+  | { type: 'rename_team'; teamId: string; name: string }
+  | { type: 'rejoin'; roomCode: string; playerId: string }
   | { type: 'leave' };
 
 // server -> client

@@ -15,9 +15,19 @@ export function cardKey(pair: CardPair): string {
 }
 
 /** seenKeys: cards shown in earlier games; those go to the back so fresh cards come first. */
-export function createGame(teams: Team[], config: GameConfig, allDecks: Deck[], seenKeys: string[] = []): GameState {
+export function createGame(
+  teams: Team[],
+  config: GameConfig,
+  allDecks: Deck[],
+  seenKeys: string[] = [],
+  flaggedWords: string[] = []
+): GameState {
   const seen = new Set(seenKeys);
-  const shuffled = shuffle(buildDeckPairs(config.deckIds, allDecks, config.mode === 'reverse'));
+  const flagged = new Set(flaggedWords);
+  const all = buildDeckPairs(config.deckIds, allDecks, config.mode === 'reverse');
+  const usable = all.filter((p) => ![...p.blue, ...(p.yellow ?? [])].some((w) => flagged.has(w)));
+  // never flag away the whole pool
+  const shuffled = shuffle(usable.length > 0 ? usable : all);
   const pairs = [...shuffled.filter((p) => !seen.has(cardKey(p))), ...shuffled.filter((p) => seen.has(cardKey(p)))];
   return {
     config,
@@ -47,6 +57,9 @@ export function createGame(teams: Team[], config: GameConfig, allDecks: Deck[], 
     lastTurnWords: [],
     lastTurnSkipped: 0,
     scoreConfirmed: true,
+    isPaused: false,
+    describerIndex: Object.fromEntries(teams.map((t) => [t.id, 0])),
+    undo: null,
   };
 }
 
@@ -84,11 +97,13 @@ export function startTurn(state: GameState): GameState {
     skippedThisTurn: 0,
     timeRemaining: state.config.turnSeconds,
     isTurnActive: true,
+    isPaused: false,
+    undo: null,
   };
 }
 
 export function tick(state: GameState): GameState {
-  if (!state.isTurnActive) return state;
+  if (!state.isTurnActive || state.isPaused) return state;
   const next = state.timeRemaining - 1;
   if (next <= 0) {
     return endTurn({ ...state, timeRemaining: 0 });
@@ -105,7 +120,7 @@ export function markCorrect(state: GameState): GameState {
   );
   const completedIndices = [...state.completedIndices, idx];
   const guessedWords = [...state.guessedWords, state.currentCard[idx]];
-  const base = { ...state, teams, completedIndices, guessedWords, guessedThisTurn: state.guessedThisTurn + 1 };
+  const base = { ...state, teams, completedIndices, guessedWords, guessedThisTurn: state.guessedThisTurn + 1, undo: snapshot(state) };
 
   if (restPending.length > 0) {
     return { ...base, pendingIndices: restPending };
@@ -126,7 +141,7 @@ export function markSkip(state: GameState): GameState {
     return state;
   }
   const [first, ...rest] = state.pendingIndices;
-  return { ...state, pendingIndices: [...rest, first], skippedThisTurn: state.skippedThisTurn + 1 };
+  return { ...state, pendingIndices: [...rest, first], skippedThisTurn: state.skippedThisTurn + 1, undo: snapshot(state) };
 }
 
 /** Flips to the other side, only once the current side's words are all guessed. Usable once per card. */
@@ -147,6 +162,7 @@ export function flipCard(state: GameState): GameState {
     cardSide: state.cardSide === 'blue' ? 'yellow' : 'blue',
     pendingIndices: words.map((_, i) => i),
     completedIndices: [],
+    undo: null,
   };
 }
 
@@ -154,7 +170,7 @@ export function flipCard(state: GameState): GameState {
 export function nextCard(state: GameState): GameState {
   if (!state.isTurnActive || state.pendingIndices.length !== 0) return state;
   const discard = state.activePair ? [...state.discard, state.activePair] : state.discard;
-  return drawCard(state, discard);
+  return { ...drawCard(state, discard), undo: null };
 }
 
 function activeTeams(state: GameState): Team[] {
@@ -219,6 +235,12 @@ export function endTurn(state: GameState): GameState {
     lastTurnWords: state.guessedWords,
     lastTurnSkipped: state.skippedThisTurn,
     scoreConfirmed: false,
+    isPaused: false,
+    undo: null,
+    describerIndex: {
+      ...state.describerIndex,
+      [state.teams[state.currentTeamIndex].id]: (state.describerIndex[state.teams[state.currentTeamIndex].id] ?? 0) + 1,
+    },
   };
 
   if (next.config.mode === 'elimination') {
@@ -298,6 +320,28 @@ export function confirmScore(state: GameState): GameState {
     if (winner) winnerId = winner.id;
   }
   return { ...state, scoreConfirmed: true, winnerId };
+}
+
+function snapshot(state: GameState): GameState {
+  return { ...state, undo: null };
+}
+
+/** Reverts the last RIGHT!/SKIP tap. The clock keeps its current time. */
+export function undoLast(state: GameState): GameState {
+  if (!state.isTurnActive || !state.undo) return state;
+  return { ...state.undo, timeRemaining: state.timeRemaining, isPaused: state.isPaused, undo: null };
+}
+
+export function setPaused(state: GameState, paused: boolean): GameState {
+  if (!state.isTurnActive) return state;
+  return { ...state, isPaused: paused };
+}
+
+/** The player on this team whose turn it is to describe (null if the team has no named players). */
+export function currentDescriber(state: GameState, teamId: string): string | null {
+  const team = state.teams.find((t) => t.id === teamId);
+  if (!team || team.players.length === 0) return null;
+  return team.players[(state.describerIndex[teamId] ?? 0) % team.players.length];
 }
 
 export function getCurrentTeam(state: GameState): Team {

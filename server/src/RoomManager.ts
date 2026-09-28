@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import { Deck, GameConfig, GameState, Team } from './shared/types';
-import { createGame, startTurn, tick, markCorrect, markSkip, flipCard, nextCard, endTurn, adjustScore, confirmScore } from './shared/GameEngine';
+import { createGame, startTurn, tick, markCorrect, markSkip, flipCard, nextCard, endTurn, adjustScore, confirmScore, undoLast, setPaused } from './shared/GameEngine';
 import { DECKS } from './shared/decks';
 import { RoomSnapshot, RoomTeam, ServerMessage } from './protocol';
 
@@ -9,6 +9,7 @@ interface Player {
   name: string;
   teamId: string;
   ws: WebSocket;
+  dropTimer?: ReturnType<typeof setTimeout>;
 }
 
 interface Room {
@@ -23,6 +24,7 @@ interface Room {
   tickHandle: ReturnType<typeof setInterval> | null;
 }
 
+const REJOIN_GRACE_MS = 10 * 60 * 1000;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function genRoomCode(): string {
@@ -190,9 +192,57 @@ export class RoomManager {
     if (room.gameState.winnerId) room.status = 'finished';
   }
 
+  undo(playerId: string) {
+    const room = this.getRoomByPlayer(playerId);
+    if (!room?.gameState) return;
+    room.gameState = undoLast(room.gameState);
+    this.broadcastGame(room);
+  }
+
+  pause(playerId: string, paused: boolean) {
+    const room = this.getRoomByPlayer(playerId);
+    if (!room?.gameState) return;
+    room.gameState = setPaused(room.gameState, paused);
+    this.broadcastGame(room);
+  }
+
+  renameTeam(playerId: string, teamId: string, name: string) {
+    const room = this.getRoomByPlayer(playerId);
+    const clean = name.trim().slice(0, 24);
+    if (!room || room.status !== 'lobby' || playerId !== room.hostPlayerId || !clean) return;
+    const team = room.teams.find((t) => t.id === teamId);
+    if (!team) return;
+    team.name = clean;
+    this.broadcastRoom(room);
+  }
+
+  /** A dropped connection keeps its seat for a while so a refreshed/locked phone can rejoin. */
+  disconnect(playerId: string) {
+    const room = this.getRoomByPlayer(playerId);
+    const player = room?.players.get(playerId);
+    if (!player) return;
+    clearTimeout(player.dropTimer);
+    player.dropTimer = setTimeout(() => this.leave(playerId), REJOIN_GRACE_MS);
+  }
+
+  rejoin(ws: WebSocket, roomCode: string, playerId: string): { room: Room } | { error: string } {
+    const room = this.rooms.get(roomCode.toUpperCase());
+    const player = room?.players.get(playerId);
+    if (!room || !player) return { error: 'That game has ended or your seat expired.' };
+    clearTimeout(player.dropTimer);
+    player.ws = ws;
+    return { room };
+  }
+
+  sendGameTo(playerId: string) {
+    const room = this.getRoomByPlayer(playerId);
+    if (room?.gameState) this.send(playerId, { type: 'game_update', state: room.gameState });
+  }
+
   leave(playerId: string) {
     const room = this.getRoomByPlayer(playerId);
     if (!room) return;
+    clearTimeout(room.players.get(playerId)?.dropTimer);
     room.players.delete(playerId);
     room.teams.forEach((t) => (t.players = t.players.filter((p) => p.id !== playerId)));
     this.playerRoom.delete(playerId);

@@ -13,7 +13,7 @@ import { DEFAULT_SERVER_URL } from '../config';
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlineHome'>;
 
 export default function OnlineHomeScreen({ navigation }: Props) {
-  const { connectAndCreate, connectAndJoin, status, room, error, clearError } = useOnline();
+  const { connectAndCreate, connectAndJoin, status, room, error, clearError, savedSession, rejoin } = useOnline();
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
   const [showServerField, setShowServerField] = useState(false);
   const [playerName, setPlayerName] = useState('');
@@ -93,6 +93,12 @@ export default function OnlineHomeScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Play Online</Text>
+      {savedSession && !room && (
+        <Pressable style={styles.rejoinCard} onPress={rejoin}>
+          <Text style={styles.rejoinTitle}>Rejoin room {savedSession.roomCode}</Text>
+          <Text style={styles.rejoinHint}>You dropped out of a game on this device. Tap to take your seat back.</Text>
+        </Pressable>
+      )}
       <Text style={styles.betaNote}>BETA — online play needs a running game server. See the README for setup.</Text>
 
       {banner && <Text style={styles.banner}>{banner}</Text>}
@@ -179,6 +185,9 @@ export default function OnlineHomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  rejoinCard: { backgroundColor: colors.gold, borderRadius: 12, padding: 14, marginBottom: 16, borderBottomWidth: 4, borderBottomColor: colors.goldDark },
+  rejoinTitle: { fontFamily: fonts.display, fontSize: 15, color: colors.ink },
+  rejoinHint: { fontFamily: fonts.body, fontSize: 12, color: colors.ink, marginTop: 4 },
   container: { flex: 1, backgroundColor: colors.cream, padding: 24, justifyContent: 'center' },
   heading: { fontFamily: fonts.display, fontSize: 24, color: colors.ink, marginBottom: 20, textAlign: 'center' },
   label: { color: colors.inkFaint, fontSize: 12, fontFamily: fonts.bodySemiBold, letterSpacing: 1, marginBottom: 6, marginTop: 14 },

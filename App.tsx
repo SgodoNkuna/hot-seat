@@ -20,6 +20,24 @@ import OnlineLobbyScreen from './src/screens/OnlineLobbyScreen';
 import OnlinePlayScreen from './src/screens/OnlinePlayScreen';
 import OnlineWinScreen from './src/screens/OnlineWinScreen';
 
+// per-screen URLs so the browser back button walks the app's own history
+const linking = {
+  prefixes: [],
+  config: {
+    screens: {
+      Home: '',
+      Setup: 'setup',
+      Play: 'play',
+      Win: 'win',
+      DeckEditor: 'categories',
+      OnlineHome: 'online',
+      OnlineLobby: 'lobby',
+      OnlinePlay: 'online-play',
+      OnlineWin: 'online-win',
+    },
+  },
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
@@ -37,7 +55,7 @@ export default function App() {
     <SafeAreaProvider>
       <GameProvider>
         <OnlineProvider>
-          <NavigationContainer>
+          <NavigationContainer linking={linking}>
             <StatusBar style="light" />
             <Stack.Navigator
               screenOptions={{

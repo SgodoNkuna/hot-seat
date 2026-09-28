@@ -64,4 +64,7 @@ export interface GameState {
   lastTurnWords: string[];
   lastTurnSkipped: number;
   scoreConfirmed: boolean;
+  isPaused: boolean;
+  describerIndex: Record<string, number>; // per team: which player describes next
+  undo: GameState | null; // snapshot before the last RIGHT!/SKIP tap, one level deep
 }

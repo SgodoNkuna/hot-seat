@@ -1,6 +1,16 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GameConfig, GameState, Deck } from '../engine/types';
 import { ClientMessage, RoomSnapshot, ServerMessage } from './protocol';
+
+interface Session {
+  serverUrl: string;
+  roomCode: string;
+  playerId: string;
+}
+
+const SESSION_KEY = 'hotseat:online-session';
+const MAX_RECONNECTS = 15;
 
 type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'error';
 
@@ -24,6 +34,12 @@ interface OnlineContextValue {
   endTurn: () => void;
   adjustScore: (delta: number) => void;
   confirmScore: () => void;
+  undo: () => void;
+  pause: (paused: boolean) => void;
+  renameTeam: (teamId: string, name: string) => void;
+  savedSession: Session | null;
+  rejoin: () => void;
+  reconnecting: boolean;
   leaveAndDisconnect: () => void;
   clearError: () => void;
 }
@@ -37,6 +53,29 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savedSession, setSavedSession] = useState<Session | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
+  const serverUrlRef = useRef('');
+  const sessionRef = useRef<Session | null>(null);
+  const leavingRef = useRef(false);
+  const retriesRef = useRef(0);
+
+  const storeSession = useCallback((session: Session | null) => {
+    sessionRef.current = session;
+    setSavedSession(session);
+    (session ? AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session)) : AsyncStorage.removeItem(SESSION_KEY)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SESSION_KEY)
+      .then((raw) => {
+        if (raw) {
+          sessionRef.current = JSON.parse(raw);
+          setSavedSession(sessionRef.current);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleMessage = useCallback((raw: string) => {
     const msg: ServerMessage = JSON.parse(raw);
@@ -44,6 +83,9 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
       case 'joined':
         setPlayerId(msg.playerId);
         setRoom(msg.room);
+        retriesRef.current = 0;
+        setReconnecting(false);
+        storeSession({ serverUrl: serverUrlRef.current, roomCode: msg.room.code, playerId: msg.playerId });
         break;
       case 'room_update':
         setRoom(msg.room);
@@ -53,6 +95,10 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
         break;
       case 'error':
         setError(msg.message);
+        if (msg.message.includes('seat expired')) {
+          storeSession(null);
+          setReconnecting(false);
+        }
         break;
     }
   }, []);
@@ -60,6 +106,8 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
   function openSocket(serverUrl: string, onOpen: (ws: WebSocket) => void) {
     setStatus('connecting');
     setError(null);
+    leavingRef.current = false;
+    serverUrlRef.current = serverUrl;
     const ws = new WebSocket(serverUrl);
     wsRef.current = ws;
     ws.onopen = () => {
@@ -68,8 +116,29 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
     };
     ws.onmessage = (e) => handleMessage(e.data);
     ws.onerror = () => setStatus('error');
-    ws.onclose = () => setStatus('closed');
+    ws.onclose = () => {
+      if (wsRef.current !== ws) return;
+      setStatus('closed');
+      // dropped mid-game (phone locked, wifi blip): quietly try to take our seat back
+      const session = sessionRef.current;
+      if (!leavingRef.current && session && retriesRef.current < MAX_RECONNECTS) {
+        retriesRef.current += 1;
+        setReconnecting(true);
+        setTimeout(() => {
+          if (!leavingRef.current) openSocket(session.serverUrl, (w) => w.send(JSON.stringify({ type: 'rejoin', roomCode: session.roomCode, playerId: session.playerId })));
+        }, 2000);
+      } else {
+        setReconnecting(false);
+      }
+    };
   }
+
+  const rejoin = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    retriesRef.current = 0;
+    openSocket(session.serverUrl, (w) => w.send(JSON.stringify({ type: 'rejoin', roomCode: session.roomCode, playerId: session.playerId })));
+  }, []);
 
   const send = useCallback((msg: ClientMessage) => {
     wsRef.current?.send(JSON.stringify(msg));
@@ -105,8 +174,14 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
   const endTurn = useCallback(() => send({ type: 'end_turn' }), [send]);
   const adjustScore = useCallback((delta: number) => send({ type: 'adjust_score', delta }), [send]);
   const confirmScore = useCallback(() => send({ type: 'confirm_score' }), [send]);
+  const undo = useCallback(() => send({ type: 'undo' }), [send]);
+  const pause = useCallback((paused: boolean) => send({ type: 'pause', paused }), [send]);
+  const renameTeam = useCallback((teamId: string, name: string) => send({ type: 'rename_team', teamId, name }), [send]);
 
   const leaveAndDisconnect = useCallback(() => {
+    leavingRef.current = true;
+    storeSession(null);
+    setReconnecting(false);
     send({ type: 'leave' });
     wsRef.current?.close();
     wsRef.current = null;
@@ -141,6 +216,12 @@ export function OnlineProvider({ children }: { children: React.ReactNode }) {
         endTurn,
         adjustScore,
         confirmScore,
+        undo,
+        pause,
+        renameTeam,
+        savedSession,
+        rejoin,
+        reconnecting,
         leaveAndDisconnect,
         clearError,
       }}

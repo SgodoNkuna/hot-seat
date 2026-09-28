@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Animated , useWindowDimensions } from 'react-native';
-import { Audio } from 'expo-av';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../state/GameContext';
@@ -15,7 +14,13 @@ import {
   getCurrentTeam,
   adjustScore,
   confirmScore,
+  undoLast,
+  setPaused,
+  currentDescriber,
 } from '../engine/GameEngine';
+import { useGameSounds } from '../useGameSounds';
+import { useHomeIfMissing, useConfirmLeave } from '../navigation/guards';
+import { loadFlags, toggleFlag } from '../data/flags';
 import CountdownRing from '../components/CountdownRing';
 import BoardMap from '../components/BoardMap';
 import { colors, fonts } from '../theme';
@@ -23,16 +28,30 @@ import { colors, fonts } from '../theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'Play'>;
 
 export default function PlayScreen({ navigation }: Props) {
-  const { state, update } = useGame();
+  const { state, update, setFlags } = useGame();
   const [showTurnCard, setShowTurnCard] = useState(true);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [flags, setFlagList] = useState<string[]>([]);
   const cardFade = useRef(new Animated.Value(1)).current;
-  const buzzerRef = useRef<Audio.Sound | null>(null);
+  useGameSounds(state);
+  useHomeIfMissing(navigation, !state);
+  useConfirmLeave(navigation, !!state && !state.winnerId);
 
   useEffect(() => {
-    return () => {
-      buzzerRef.current?.unloadAsync();
-    };
+    loadFlags().then(setFlagList);
   }, []);
+
+  // 3-2-1 before the clock starts
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      setCountdown(null);
+      update((s) => startTurn(s));
+      return;
+    }
+    const t = setTimeout(() => setCountdown(countdown - 1), 800);
+    return () => clearTimeout(t);
+  }, [countdown]);
 
   useEffect(() => {
     if (state?.winnerId && state.scoreConfirmed) {
@@ -48,25 +67,15 @@ export default function PlayScreen({ navigation }: Props) {
     return () => clearInterval(interval);
   }, [state?.isTurnActive]);
 
-  useEffect(() => {
-    if (state?.timeRemaining === 0 && !state.isTurnActive) {
-      playBuzzer();
-    }
-  }, [state?.timeRemaining, state?.isTurnActive]);
-
-  async function playBuzzer() {
-    try {
-      const { sound } = await Audio.Sound.createAsync(require('../../assets/buzzer.wav'));
-      buzzerRef.current = sound;
-      await sound.playAsync();
-    } catch {
-      // sound is best-effort; ignore failures (e.g. audio permissions denied)
-    }
-  }
-
   function handleStartTurn() {
     setShowTurnCard(false);
-    update((s) => startTurn(s));
+    setCountdown(3);
+  }
+
+  async function handleFlag(word: string) {
+    const next = await toggleFlag(word);
+    setFlagList(next);
+    setFlags(next);
   }
 
   function handleEndTurnEarly() {
@@ -87,6 +96,16 @@ export default function PlayScreen({ navigation }: Props) {
   const cardWords = state.currentCard ?? [];
   const sideComplete = state.isTurnActive && state.currentCard !== null && state.pendingIndices.length === 0;
   const canFlip = sideComplete && state.config.allowFlip && !!state.currentCardOtherSide;
+  const describer = currentDescriber(state, currentTeam.id);
+
+  if (countdown !== null) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.teamLabel}>{describer ? `${describer}, get ready` : 'Get ready'}</Text>
+        <Text style={styles.countdownNum}>{countdown}</Text>
+      </View>
+    );
+  }
 
   if (showTurnCard) {
     return (
@@ -94,6 +113,7 @@ export default function PlayScreen({ navigation }: Props) {
         <Animated.View style={[styles.turnCard, { opacity: cardFade }]}>
           <Text style={styles.upNextLabel}>Up Next</Text>
           <Text style={styles.teamNameBig}>{currentTeam.name}</Text>
+          {describer && <Text style={styles.describerText}>{describer} describes</Text>}
           <Text style={styles.roundLabel}>Round {state.round}</Text>
           {state.suddenDeathActive && (
             <Text style={styles.suddenDeathBadge}>⚡ Sudden Death — final round!</Text>
@@ -144,12 +164,13 @@ export default function PlayScreen({ navigation }: Props) {
           {state.lastTurnWords.length > 0 && (
             <View style={styles.wordChipRow}>
               {state.lastTurnWords.map((word, i) => (
-                <View key={i} style={styles.wordChip}>
-                  <Text style={styles.wordChipText}>{word}</Text>
-                </View>
+                <Pressable key={i} style={[styles.wordChip, flags.includes(word) && styles.wordChipFlagged]} onPress={() => handleFlag(word)}>
+                  <Text style={styles.wordChipText}>{flags.includes(word) ? '⚑ ' : ''}{word}</Text>
+                </Pressable>
               ))}
             </View>
           )}
+          {state.lastTurnWords.length > 0 && <Text style={styles.flagHint}>Tap a word to flag a bad card</Text>}
           <Text style={styles.confirmHint}>Pass the phone — have the other team check the score</Text>
           <View style={styles.adjustRow}>
             <Pressable style={styles.adjustButton} onPress={() => update((s) => adjustScore(s, -1))}>
@@ -169,10 +190,23 @@ export default function PlayScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.teamLabel}>{currentTeam.name}'s Turn</Text>
+      <View style={styles.topBar}>
+        <Text style={styles.teamLabel}>
+          {currentTeam.name}{describer ? ` · ${describer} describing` : "'s Turn"}
+        </Text>
+        <Pressable style={styles.pauseButton} onPress={() => update((s) => setPaused(s, !s.isPaused))}>
+          <Text style={styles.pauseButtonText}>{state.isPaused ? 'RESUME' : 'PAUSE'}</Text>
+        </Pressable>
+      </View>
 
       <CountdownRing totalSeconds={state.config.turnSeconds} timeRemaining={state.timeRemaining} size={compact ? 120 : 184} />
 
+      {state.isPaused ? (
+        <View style={[styles.wordCard, styles.pausedCard]}>
+          <Text style={styles.pausedTitle}>PAUSED</Text>
+          <Text style={styles.pausedHint}>Words hidden. Tap RESUME to carry on.</Text>
+        </View>
+      ) : (
       <View
         style={[
           styles.wordCard,
@@ -195,8 +229,9 @@ export default function PlayScreen({ navigation }: Props) {
           );
         })}
       </View>
+      )}
 
-      {sideComplete ? (
+      {state.isPaused ? null : sideComplete ? (
         <View style={styles.sideCompleteRow}>
           {canFlip && (
             <Pressable
@@ -234,9 +269,16 @@ export default function PlayScreen({ navigation }: Props) {
         </View>
       )}
 
-      <Pressable style={styles.endEarlyLink} onPress={handleEndTurnEarly}>
-        <Text style={styles.endEarlyText}>End turn early</Text>
-      </Pressable>
+      <View style={styles.bottomLinks}>
+        {state.undo && !state.isPaused && (
+          <Pressable style={styles.endEarlyLink} onPress={() => update((s) => undoLast(s))}>
+            <Text style={styles.undoText}>↶ Undo last tap</Text>
+          </Pressable>
+        )}
+        <Pressable style={styles.endEarlyLink} onPress={handleEndTurnEarly}>
+          <Text style={styles.endEarlyText}>End turn early</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -246,7 +288,19 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   hidden: { display: 'none' },
   container: { flex: 1, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  teamLabel: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: colors.gold, marginBottom: 22 },
+  teamLabel: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: colors.gold, flexShrink: 1 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 18, gap: 10 },
+  pauseButton: { borderWidth: 2, borderColor: colors.gold, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  pauseButtonText: { fontFamily: fonts.display, fontSize: 11, color: colors.gold, letterSpacing: 1 },
+  pausedCard: { paddingVertical: 48 },
+  pausedTitle: { fontFamily: fonts.display, fontSize: 28, color: colors.ink },
+  pausedHint: { fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft, marginTop: 8, textAlign: 'center' },
+  bottomLinks: { flexDirection: 'row', gap: 24, alignItems: 'center' },
+  undoText: { color: colors.gold, fontSize: 13, letterSpacing: 1, fontFamily: fonts.bodySemiBold },
+  countdownNum: { fontFamily: fonts.display, fontSize: 120, color: colors.cream, marginTop: 24 },
+  describerText: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.red, marginBottom: 4 },
+  wordChipFlagged: { backgroundColor: '#F3C2B5' },
+  flagHint: { color: colors.inkFaint, fontSize: 11, marginTop: -8, marginBottom: 12, fontFamily: fonts.body },
   wordCard: {
     backgroundColor: colors.paper,
     borderRadius: 14,

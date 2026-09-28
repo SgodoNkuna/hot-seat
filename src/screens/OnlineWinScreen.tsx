@@ -5,11 +5,14 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useOnline } from '../online/OnlineContext';
 import { colors, fonts } from '../theme';
+import { useHomeIfMissing } from '../navigation/guards';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlineWin'>;
 
 export default function OnlineWinScreen({ navigation }: Props) {
   const { gameState, leaveAndDisconnect } = useOnline();
+
+  useHomeIfMissing(navigation, !gameState);
 
   if (!gameState) return null;
 

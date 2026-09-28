@@ -5,6 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../state/GameContext';
 import { colors, fonts } from '../theme';
+import { useHomeIfMissing } from '../navigation/guards';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Win'>;
 
@@ -26,6 +27,8 @@ export default function WinScreen({ navigation }: Props) {
       setOutcome(recordMatchWinAndContinue());
     }
   }, [isMarathon, match, recordMatchWinAndContinue]);
+
+  useHomeIfMissing(navigation, !state);
 
   if (!state) return null;
 
