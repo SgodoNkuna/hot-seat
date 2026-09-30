@@ -67,4 +67,15 @@ export interface GameState {
   isPaused: boolean;
   describerIndex: Record<string, number>; // per team: which player describes next
   undo: GameState | null; // snapshot before the last RIGHT!/SKIP tap, one level deep
+  boardEvent: string | null; // what a Board Map special square just did, shown on the next screen
+  lastTurnDescriber: string | null;
+  turnLog: TurnRecord[]; // confirmed turns, for end-of-game highlights
 }
+
+export interface TurnRecord {
+  teamId: string;
+  describer: string | null;
+  guessed: number;
+}
+
+export type SpecialSquare = 'boost' | 'slide' | 'steal';

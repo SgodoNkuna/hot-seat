@@ -41,7 +41,8 @@ jobs:
       # release build signed with the template's debug key: fine for sharing/sideloading, not for the Play Store
       - name: Gradle assembleRelease
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        # ARM only: every real Android phone; x86 builds are only for emulators and nearly double the size
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
 
       - run: cp android/app/build/outputs/apk/release/app-release.apk hot-seat.apk
 

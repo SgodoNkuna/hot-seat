@@ -119,6 +119,7 @@ export default function PlayScreen({ navigation }: Props) {
             <Text style={styles.suddenDeathBadge}>⚡ Sudden Death — final round!</Text>
           )}
 
+          {state.boardEvent && <Text style={styles.boardEvent}>{state.boardEvent}</Text>}
           {state.config.mode === 'board' && (
             <BoardMap teams={state.teams} target={state.config.targetScore} highlightTeamId={currentTeam.id} />
           )}
@@ -284,6 +285,7 @@ export default function PlayScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  boardEvent: { backgroundColor: colors.gold, color: colors.ink, fontFamily: fonts.bodySemiBold, fontSize: 14, textAlign: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginBottom: 12, overflow: 'hidden' },
   scroll: { flex: 1, backgroundColor: colors.ink },
   scrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   hidden: { display: 'none' },

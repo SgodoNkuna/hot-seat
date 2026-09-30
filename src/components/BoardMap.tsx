@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Platform, LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import { Team } from '../engine/types';
+import { specialSquares } from '../engine/GameEngine';
 import { colors, fonts } from '../theme';
 
 const PIECE_COLORS = ['#D94F30', '#2F6690', '#E8A33D', '#3C8D5A', '#7B4B94', '#3A2318'];
@@ -123,6 +124,8 @@ export default function BoardMap({ teams, target, highlightTeamId, startFrom }: 
   };
 
   const squares = Array.from({ length: target + 1 }, (_, i) => i);
+  const specials = specialSquares(target);
+  const ICON = { boost: '⭐', slide: '⚠', steal: '🎯' } as const;
   const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] });
   const winBg = winGlow.interpolate({ inputRange: [0, 1], outputRange: [colors.red, '#F07A55'] });
 
@@ -148,6 +151,7 @@ export default function BoardMap({ teams, target, highlightTeamId, startFrom }: 
                 <Text style={[styles.squareNum, (isStart || isFinish) && styles.squareNumLight]}>
                   {isStart ? 'GO' : isFinish ? 'WIN' : sq}
                 </Text>
+                {specials[sq] && <Text style={[styles.specialIcon, { fontSize: Math.max(10, size * 0.38) }]}>{ICON[specials[sq]]}</Text>}
               </Animated.View>
             );
           })}
@@ -180,6 +184,7 @@ export default function BoardMap({ teams, target, highlightTeamId, startFrom }: 
             );
           })}
       </View>
+      <Text style={styles.specialLegend}>⭐ jump 2 · ⚠ back 3 · 🎯 steal 1 from the leader</Text>
       <View style={styles.legend}>
         {teams.map((t, ti) => (
           <View key={t.id} style={styles.legendItem}>
@@ -203,6 +208,7 @@ const styles = StyleSheet.create({
   squareStart: { backgroundColor: colors.ink },
   squareNum: { fontSize: 11, color: colors.inkSoft, fontFamily: fonts.bodySemiBold },
   squareNumLight: { color: colors.cream },
+  specialIcon: { position: 'absolute', right: 3, bottom: 1, opacity: 0.85 },
   piece: {
     position: 'absolute',
     left: 0,
@@ -222,6 +228,7 @@ const styles = StyleSheet.create({
   },
   pieceActive: { borderColor: colors.gold },
   pieceText: { fontSize: 10, color: '#fff', fontFamily: fonts.bodySemiBold },
+  specialLegend: { fontSize: 11, color: colors.inkFaint, fontFamily: fonts.body, textAlign: 'center', marginTop: 6 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8, justifyContent: 'center' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },

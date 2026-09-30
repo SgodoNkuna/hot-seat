@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useOnline } from '../online/OnlineContext';
 import { colors, fonts } from '../theme';
 import { useHomeIfMissing } from '../navigation/guards';
+import Highlights from '../components/Highlights';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlineWin'>;
 
@@ -25,7 +26,7 @@ export default function OnlineWinScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <View style={styles.trophyBadge}>
         <Svg width={46} height={46} viewBox="0 0 24 24" fill="none">
           <Path d="M8 21h8M12 17v4M6 4h12v3a6 6 0 0 1-12 0V4z" stroke={colors.ink} strokeWidth={2} strokeLinejoin="round" />
@@ -45,15 +46,18 @@ export default function OnlineWinScreen({ navigation }: Props) {
         ))}
       </View>
 
+      <Highlights state={gameState} />
+
       <Pressable style={styles.button} onPress={goHome}>
         <Text style={styles.buttonText}>Home</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  scroll: { flex: 1, backgroundColor: colors.red },
+  container: { flexGrow: 1, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', padding: 24 },
   trophyBadge: {
     width: 92,
     height: 92,

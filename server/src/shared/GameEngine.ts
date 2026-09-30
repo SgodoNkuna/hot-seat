@@ -1,4 +1,4 @@
-import { CardPair, Deck, GameConfig, GameState, Team } from './types';
+import { CardPair, Deck, GameConfig, GameState, SpecialSquare, Team } from './types';
 import { buildDeckPairs } from './decks';
 
 function shuffle<T>(arr: T[]): T[] {
@@ -60,6 +60,9 @@ export function createGame(
     isPaused: false,
     describerIndex: Object.fromEntries(teams.map((t) => [t.id, 0])),
     undo: null,
+    boardEvent: null,
+    lastTurnDescriber: null,
+    turnLog: [],
   };
 }
 
@@ -233,6 +236,7 @@ export function endTurn(state: GameState): GameState {
     lastTurnTeamId: state.teams[state.currentTeamIndex].id,
     lastTurnGuessed: state.guessedThisTurn,
     lastTurnWords: state.guessedWords,
+    lastTurnDescriber: currentDescriber(state, state.teams[state.currentTeamIndex].id),
     lastTurnSkipped: state.skippedThisTurn,
     scoreConfirmed: false,
     isPaused: false,
@@ -312,8 +316,60 @@ export function adjustScore(state: GameState, delta: number): GameState {
 }
 
 /** Locks in the just-finished team's score and, for score-target modes, checks for a winner. */
+const SPECIAL_SPOTS: [number, SpecialSquare][] = [
+  [0.2, 'boost'],
+  [0.33, 'slide'],
+  [0.45, 'steal'],
+  [0.55, 'boost'],
+  [0.68, 'slide'],
+  [0.8, 'boost'],
+  [0.88, 'steal'],
+  [0.93, 'slide'],
+];
+
+/** Board Map special squares for a board of this length, spread by proportion so any target gets a few. */
+export function specialSquares(target: number): Record<number, SpecialSquare> {
+  const out: Record<number, SpecialSquare> = {};
+  for (const [frac, kind] of SPECIAL_SPOTS) {
+    const sq = Math.round(frac * target);
+    if (sq > 1 && sq < target && !out[sq]) out[sq] = kind;
+  }
+  return out;
+}
+
+/** Applies the special square the just-finished team landed on (one hop, no chains). */
+function applyBoardSquare(state: GameState): GameState {
+  if (state.config.mode !== 'board' || !state.lastTurnTeamId) return state;
+  const target = state.config.targetScore;
+  const me = state.teams.find((t) => t.id === state.lastTurnTeamId);
+  if (!me || me.score >= target) return state;
+  const kind = specialSquares(target)[me.score];
+  if (!kind) return state;
+  const setScore = (id: string, score: number) =>
+    state.teams.map((t) => (t.id === id ? { ...t, score: Math.max(0, score) } : t));
+  if (kind === 'boost') {
+    return { ...state, teams: setScore(me.id, me.score + 2), boardEvent: `⭐ ${me.name} hit a Boost — jump 2 squares!` };
+  }
+  if (kind === 'slide') {
+    return { ...state, teams: setScore(me.id, me.score - 3), boardEvent: `⚠ ${me.name} hit a Slide — back 3 squares!` };
+  }
+  const rival = state.teams
+    .filter((t) => t.id !== me.id && !state.eliminatedTeamIds.includes(t.id) && t.score > 0)
+    .sort((a, b) => b.score - a.score)[0];
+  if (!rival) return { ...state, boardEvent: `🎯 ${me.name} hit a Steal — but nobody had a point to take!` };
+  const teams = state.teams.map((t) =>
+    t.id === me.id ? { ...t, score: t.score + 1 } : t.id === rival.id ? { ...t, score: t.score - 1 } : t
+  );
+  return { ...state, teams, boardEvent: `🎯 ${me.name} stole a square from ${rival.name}!` };
+}
+
 export function confirmScore(state: GameState): GameState {
   if (state.scoreConfirmed) return state;
+  if (state.lastTurnTeamId) {
+    const record = { teamId: state.lastTurnTeamId, describer: state.lastTurnDescriber, guessed: state.lastTurnGuessed };
+    state = { ...state, turnLog: [...state.turnLog, record] };
+  }
+  state = applyBoardSquare({ ...state, boardEvent: null });
   let winnerId = state.winnerId;
   if (!winnerId && ['classic', 'blitz', 'themed', 'reverse', 'board'].includes(state.config.mode)) {
     const winner = classicWinner(state);

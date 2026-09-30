@@ -7,6 +7,9 @@ import { DECKS } from '../data/decks';
 import { loadCustomDecks } from '../data/customDecks';
 import { Deck, GameMode, MatchFormat, Team } from '../engine/types';
 import { colors, fonts } from '../theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const LAST_SETUP_KEY = 'hotseat:last-setup';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Setup'>;
 
@@ -14,7 +17,7 @@ const TARGET_OPTIONS = [10, 20, 30, 50];
 
 const MODES: { id: GameMode; label: string; blurb: string; fixedTurnSeconds?: number }[] = [
   { id: 'classic', label: 'Classic', blurb: 'First team to the target score wins.' },
-  { id: 'board', label: 'Board Map', blurb: 'Every correct word moves your team piece one square along the board. First to the WIN square takes it.' },
+  { id: 'board', label: 'Board Map', blurb: 'Every correct word moves your piece one square. Land on ⭐ to jump ahead, ⚠ to slide back, 🎯 to steal from the leader. First to WIN takes it.' },
   { id: 'themed', label: 'Themed', blurb: 'Classic rules, locked to one category.' },
   { id: 'blitz', label: 'Blitz', blurb: '15-second turns, fast and chaotic.', fixedTurnSeconds: 15 },
   { id: 'suddenDeath', label: 'Sudden Death', blurb: 'Final showdown round once a team gets close to winning.' },
@@ -42,7 +45,39 @@ export default function SetupScreen({ navigation }: Props) {
 
   useEffect(() => {
     loadCustomDecks().then(setCustomDecks);
+    // same crowd, same settings: bring back last game's setup
+    AsyncStorage.getItem(LAST_SETUP_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        setTeams(saved.teams.map((t: Team) => ({ ...t, score: 0 })));
+        setMode(saved.mode);
+        setTargetScore(saved.targetScore);
+        setTurnSeconds(saved.turnSeconds);
+        setAllowSkip(saved.allowSkip);
+        setAllowFlip(saved.allowFlip);
+        setRandomSide(!!saved.randomSide);
+        setMatchFormat(saved.matchFormat);
+        if (saved.selectedDecks?.length) setSelectedDecks(saved.selectedDecks);
+      })
+      .catch(() => {});
   }, []);
+
+  function resetSetup() {
+    AsyncStorage.removeItem(LAST_SETUP_KEY).catch(() => {});
+    setTeams([
+      { id: 't1', name: 'Team 1', players: [], score: 0 },
+      { id: 't2', name: 'Team 2', players: [], score: 0 },
+    ]);
+    setMode('classic');
+    setTargetScore(30);
+    setTurnSeconds(30);
+    setAllowSkip(true);
+    setAllowFlip(false);
+    setRandomSide(false);
+    setMatchFormat('single');
+    setSelectedDecks(DECKS.filter((d) => !d.id.startsWith('lang-')).map((d) => d.id));
+  }
 
   const allDecks = [...DECKS, ...customDecks];
   const currentModeDef = MODES.find((m) => m.id === mode)!;
@@ -98,18 +133,23 @@ export default function SetupScreen({ navigation }: Props) {
       setBanner(`Add at least one player to: ${empty}`);
       return;
     }
-    if (selectedDecks.length === 0) {
+    const liveDecks = selectedDecks.filter((id) => allDecks.some((d) => d.id === id));
+    if (liveDecks.length === 0) {
       setBanner('Pick at least one category to play with.');
       return;
     }
     setBanner(null);
+    AsyncStorage.setItem(
+      LAST_SETUP_KEY,
+      JSON.stringify({ teams, mode, targetScore, turnSeconds, allowSkip, allowFlip, randomSide, matchFormat, selectedDecks })
+    ).catch(() => {});
     beginMatch(
       teams,
       {
         mode,
         targetScore,
         turnSeconds,
-        deckIds: selectedDecks,
+        deckIds: liveDecks,
         allowSkip,
         allowFlip,
         randomSide,
@@ -188,9 +228,14 @@ export default function SetupScreen({ navigation }: Props) {
         </View>
       ))}
 
-      <Pressable style={styles.linkButton} onPress={addTeam}>
-        <Text style={styles.linkButtonText}>+ Add another team</Text>
-      </Pressable>
+      <View style={styles.teamLinksRow}>
+        <Pressable style={styles.linkButton} onPress={addTeam}>
+          <Text style={styles.linkButtonText}>+ Add another team</Text>
+        </Pressable>
+        <Pressable style={styles.linkButton} onPress={resetSetup}>
+          <Text style={styles.resetText}>Start fresh</Text>
+        </Pressable>
+      </View>
 
       {mode !== 'elimination' && (
         <>
@@ -295,6 +340,8 @@ export default function SetupScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  teamLinksRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  resetText: { color: colors.inkFaint, fontSize: 13, fontFamily: fonts.bodySemiBold },
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 20, paddingBottom: 60 },
   heading: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: colors.ink, marginTop: 22, marginBottom: 10 },

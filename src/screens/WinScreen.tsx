@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Animated } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../state/GameContext';
 import { colors, fonts } from '../theme';
 import { useHomeIfMissing } from '../navigation/guards';
+import Highlights from '../components/Highlights';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Win'>;
 
@@ -51,7 +52,7 @@ export default function WinScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <Animated.View style={{ transform: [{ scale }], alignItems: 'center' }}>
         <View style={styles.trophyBadge}>
           <Svg width={46} height={46} viewBox="0 0 24 24" fill="none">
@@ -74,6 +75,8 @@ export default function WinScreen({ navigation }: Props) {
           </View>
         ))}
       </View>
+
+      <Highlights state={state} />
 
       {isMarathon && match && (
         <View style={styles.matchWinsBoard}>
@@ -98,12 +101,13 @@ export default function WinScreen({ navigation }: Props) {
       <Pressable style={[styles.button, styles.buttonSecondary]} onPress={goHome}>
         <Text style={styles.buttonTextSecondary}>Home</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  scroll: { flex: 1, backgroundColor: colors.red },
+  container: { flexGrow: 1, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', padding: 24 },
   trophyBadge: {
     width: 92,
     height: 92,

@@ -5,7 +5,8 @@ import { NavigationProp, ParamListBase } from '@react-navigation/native';
 /** A refreshed browser tab loses in-memory game state; send the player Home instead of a blank screen. */
 export function useHomeIfMissing(navigation: NavigationProp<ParamListBase>, missing: boolean) {
   useEffect(() => {
-    if (missing) navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    // only the visible screen redirects: "Play Again" clears the game while the Win screen is still underneath
+    if (missing && navigation.isFocused()) navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [missing]);
 }
 
