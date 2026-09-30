@@ -55,6 +55,10 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.buttonOutlineText}>Edit Categories</Text>
         </Pressable>
 
+        <Pressable onPress={() => navigation.navigate('HowToPlay')} style={styles.howTo}>
+          <Text style={styles.howToText}>How to play</Text>
+        </Pressable>
+
         <Text style={styles.footer}>— EST. FAMILY NIGHT —</Text>
       </View>
     </View>
@@ -62,6 +66,8 @@ export default function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  howTo: { marginTop: 14, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 12 },
+  howToText: { color: colors.red, fontFamily: fonts.bodySemiBold, fontSize: 15, textDecorationLine: 'underline' },
   container: { flex: 1, backgroundColor: colors.cream },
   marquee: {
     height: 220,

@@ -75,7 +75,10 @@ function drawCard(state: GameState, discard: CardPair[] = state.discard): GameSt
     pool = [];
   }
   const [pair, ...rest] = deck;
-  const yellowFirst = !!(state.config.randomSide && pair?.yellow && Math.random() < 0.5);
+  const yellowFirst = !!(
+    pair?.yellow &&
+    (state.config.hardMode || (state.config.randomSide && Math.random() < 0.5))
+  );
   const shown = (yellowFirst ? pair?.yellow : pair?.blue) ?? null;
   const other = (yellowFirst ? pair?.blue : pair?.yellow) ?? null;
   return {

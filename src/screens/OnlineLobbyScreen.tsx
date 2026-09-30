@@ -12,7 +12,7 @@ import { PUBLIC_URL } from '../config';
 type Props = NativeStackScreenProps<RootStackParamList, 'OnlineLobby'>;
 
 const TARGET_OPTIONS = [10, 20, 30, 50];
-const TURN_OPTIONS = [15, 30];
+const TURN_OPTIONS = [15, 30, 45, 60];
 const MODE_OPTIONS: { id: GameMode; label: string }[] = [
   { id: 'classic', label: 'Classic' },
   { id: 'board', label: 'Board Map' },
@@ -160,9 +160,24 @@ export default function OnlineLobbyScreen({ navigation }: Props) {
             />
           </View>
 
-          <View style={styles.switchRow}>
-            <Text style={styles.heading}>Random Card Side</Text>
-            <Switch value={!!room.config.randomSide} onValueChange={(v) => updateConfig({ randomSide: v })} />
+          <Text style={styles.heading}>Difficulty</Text>
+          <View style={styles.optionRow}>
+            {(['easy', 'mixed', 'hard'] as const).map((d) => {
+              const hard = !!room.config.hardMode;
+              const mixed = !!room.config.randomSide && !hard;
+              const active = d === 'hard' ? hard : d === 'mixed' ? mixed : !hard && !mixed;
+              return (
+                <Pressable
+                  key={d}
+                  style={[styles.optionChip, active && styles.optionChipActive]}
+                  onPress={() => updateConfig({ hardMode: d === 'hard', randomSide: d === 'mixed' })}
+                >
+                  <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>
+                    {d === 'easy' ? 'Easy' : d === 'mixed' ? 'Mixed' : 'Hard'}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           <Pressable style={styles.startButton} onPress={startGame}>

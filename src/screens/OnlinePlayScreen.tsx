@@ -149,7 +149,7 @@ export default function OnlinePlayScreen({ navigation }: Props) {
           {reconnectBanner}
           {isDescriber ? (
             <Pressable style={styles.startButton} onPress={() => setCountdown(3)}>
-              <Text style={styles.startButtonText}>Start 30 Seconds</Text>
+              <Text style={styles.startButtonText}>Start {gameState.config.turnSeconds} Seconds</Text>
             </Pressable>
           ) : (
             <Text style={styles.waitingText}>
@@ -192,10 +192,10 @@ export default function OnlinePlayScreen({ navigation }: Props) {
         style={[
           styles.wordCard,
           compact && styles.wordCardCompact,
-          (gameState.config.allowFlip || gameState.config.randomSide) && (gameState.cardSide === 'blue' ? styles.wordCardBlue : styles.wordCardYellow),
+          (gameState.config.allowFlip || gameState.config.randomSide || gameState.config.hardMode) && (gameState.cardSide === 'blue' ? styles.wordCardBlue : styles.wordCardYellow),
         ]}
       >
-        {(gameState.config.allowFlip || gameState.config.randomSide) && (
+        {(gameState.config.allowFlip || gameState.config.randomSide || gameState.config.hardMode) && (
           <Text style={[styles.sideLabel, gameState.cardSide === 'blue' ? styles.sideLabelBlue : styles.sideLabelYellow]}>
             {gameState.cardSide === 'blue' ? 'BLUE SIDE' : 'YELLOW SIDE'}
           </Text>

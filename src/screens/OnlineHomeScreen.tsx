@@ -20,7 +20,7 @@ export default function OnlineHomeScreen({ navigation, route }: Props) {
   // a scanned QR link arrives as /online?code=ABCD
   const [roomCode, setRoomCode] = useState((route.params?.code ?? '').toUpperCase());
   const [customDecks, setCustomDecks] = useState<Deck[]>([]);
-  const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>(DECKS.filter((d) => !d.id.startsWith('lang-')).map((d) => d.id));
+  const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>(DECKS.filter((d) => !d.id.startsWith('lang-') && d.id !== 'kids').map((d) => d.id));
   const [banner, setBanner] = useState<string | null>(null);
 
   useEffect(() => {

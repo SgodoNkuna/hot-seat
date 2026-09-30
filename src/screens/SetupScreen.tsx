@@ -38,10 +38,11 @@ export default function SetupScreen({ navigation }: Props) {
   const [allowSkip, setAllowSkip] = useState(true);
   const [allowFlip, setAllowFlip] = useState(false);
   const [randomSide, setRandomSide] = useState(false);
+  const [hardMode, setHardMode] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   const [matchFormat, setMatchFormat] = useState<MatchFormat>('single');
   const [customDecks, setCustomDecks] = useState<Deck[]>([]);
-  const [selectedDecks, setSelectedDecks] = useState<string[]>(DECKS.filter((d) => !d.id.startsWith('lang-')).map((d) => d.id));
+  const [selectedDecks, setSelectedDecks] = useState<string[]>(DECKS.filter((d) => !d.id.startsWith('lang-') && d.id !== 'kids').map((d) => d.id));
 
   useEffect(() => {
     loadCustomDecks().then(setCustomDecks);
@@ -57,6 +58,7 @@ export default function SetupScreen({ navigation }: Props) {
         setAllowSkip(saved.allowSkip);
         setAllowFlip(saved.allowFlip);
         setRandomSide(!!saved.randomSide);
+        setHardMode(!!saved.hardMode);
         setMatchFormat(saved.matchFormat);
         if (saved.selectedDecks?.length) setSelectedDecks(saved.selectedDecks);
       })
@@ -75,8 +77,9 @@ export default function SetupScreen({ navigation }: Props) {
     setAllowSkip(true);
     setAllowFlip(false);
     setRandomSide(false);
+    setHardMode(false);
     setMatchFormat('single');
-    setSelectedDecks(DECKS.filter((d) => !d.id.startsWith('lang-')).map((d) => d.id));
+    setSelectedDecks(DECKS.filter((d) => !d.id.startsWith('lang-') && d.id !== 'kids').map((d) => d.id));
   }
 
   const allDecks = [...DECKS, ...customDecks];
@@ -141,7 +144,7 @@ export default function SetupScreen({ navigation }: Props) {
     setBanner(null);
     AsyncStorage.setItem(
       LAST_SETUP_KEY,
-      JSON.stringify({ teams, mode, targetScore, turnSeconds, allowSkip, allowFlip, randomSide, matchFormat, selectedDecks })
+      JSON.stringify({ teams, mode, targetScore, turnSeconds, allowSkip, allowFlip, randomSide, hardMode, matchFormat, selectedDecks })
     ).catch(() => {});
     beginMatch(
       teams,
@@ -153,6 +156,7 @@ export default function SetupScreen({ navigation }: Props) {
         allowSkip,
         allowFlip,
         randomSide,
+        hardMode,
         matchFormat,
         suddenDeathMargin: 3,
       },
@@ -260,7 +264,7 @@ export default function SetupScreen({ navigation }: Props) {
         <>
           <Text style={styles.heading}>Turn Length</Text>
           <View style={styles.optionRow}>
-            {[15, 30].map((val) => (
+            {[15, 30, 45, 60].map((val) => (
               <Pressable
                 key={val}
                 style={[styles.optionChip, turnSeconds === val && styles.optionChipActive]}
@@ -290,13 +294,29 @@ export default function SetupScreen({ navigation }: Props) {
         </Text>
       )}
 
-      <View style={styles.switchRow}>
-        <Text style={styles.heading}>Random Card Side</Text>
-        <Switch value={randomSide} onValueChange={setRandomSide} />
+      <Text style={styles.heading}>Difficulty</Text>
+      <View style={styles.optionRow}>
+        {(['easy', 'mixed', 'hard'] as const).map((d) => {
+          const active = d === 'hard' ? hardMode : d === 'mixed' ? randomSide && !hardMode : !randomSide && !hardMode;
+          return (
+            <Pressable
+              key={d}
+              style={[styles.optionChip, active && styles.optionChipActive]}
+              onPress={() => {
+                setHardMode(d === 'hard');
+                setRandomSide(d === 'mixed');
+              }}
+            >
+              <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>
+                {d === 'easy' ? 'Easy' : d === 'mixed' ? 'Mixed' : 'Hard'}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
-      {randomSide && (
-        <Text style={styles.blurbText}>Each card lands on blue or yellow at random, so any turn can be easy or hard.</Text>
-      )}
+      <Text style={styles.blurbText}>
+        {hardMode ? 'Every card shows its yellow (harder) side.' : randomSide ? 'Each card lands on blue or yellow at random, so any turn can be easy or hard.' : 'Every card shows its blue (easier) side.'}
+      </Text>
 
       <View style={styles.switchRow}>
         <Text style={styles.heading}>Best of 3 (Marathon)</Text>

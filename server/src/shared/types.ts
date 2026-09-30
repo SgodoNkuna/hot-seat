@@ -32,6 +32,7 @@ export interface GameConfig {
   allowSkip: boolean;
   allowFlip: boolean; // blue/yellow two-sided card rule
   randomSide?: boolean; // each card randomly starts on blue or yellow
+  hardMode?: boolean; // every card starts on its yellow side
   matchFormat: MatchFormat;
   suddenDeathMargin: number; // how close to targetScore triggers sudden death
 }

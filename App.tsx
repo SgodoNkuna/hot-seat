@@ -16,6 +16,7 @@ import SetupScreen from './src/screens/SetupScreen';
 import PlayScreen from './src/screens/PlayScreen';
 import WinScreen from './src/screens/WinScreen';
 import DeckEditorScreen from './src/screens/DeckEditorScreen';
+import HowToPlayScreen from './src/screens/HowToPlayScreen';
 import OnlineHomeScreen from './src/screens/OnlineHomeScreen';
 import OnlineLobbyScreen from './src/screens/OnlineLobbyScreen';
 import OnlinePlayScreen from './src/screens/OnlinePlayScreen';
@@ -31,6 +32,7 @@ const linking = {
       Play: WEB_BASE + 'play',
       Win: WEB_BASE + 'win',
       DeckEditor: WEB_BASE + 'categories',
+      HowToPlay: WEB_BASE + 'how-to-play',
       OnlineHome: WEB_BASE + 'online',
       OnlineLobby: WEB_BASE + 'lobby',
       OnlinePlay: WEB_BASE + 'online-play',
@@ -78,6 +80,11 @@ export default function App() {
                 name="Win"
                 component={WinScreen}
                 options={{ headerShown: false, gestureEnabled: false }}
+              />
+              <Stack.Screen
+                name="HowToPlay"
+                component={HowToPlayScreen}
+                options={{ title: 'HOW TO PLAY' }}
               />
               <Stack.Screen
                 name="DeckEditor"

@@ -137,7 +137,7 @@ export default function PlayScreen({ navigation }: Props) {
           </View>
 
           <Pressable style={styles.startButton} onPress={handleStartTurn}>
-            <Text style={styles.startButtonText}>Start 30 Seconds</Text>
+            <Text style={styles.startButtonText}>Start {state.config.turnSeconds} Seconds</Text>
           </Pressable>
         </Animated.View>
       </ScrollView>
@@ -212,10 +212,10 @@ export default function PlayScreen({ navigation }: Props) {
         style={[
           styles.wordCard,
           compact && styles.wordCardCompact,
-          (state.config.allowFlip || state.config.randomSide) && (state.cardSide === 'blue' ? styles.wordCardBlue : styles.wordCardYellow),
+          (state.config.allowFlip || state.config.randomSide || state.config.hardMode) && (state.cardSide === 'blue' ? styles.wordCardBlue : styles.wordCardYellow),
         ]}
       >
-        {(state.config.allowFlip || state.config.randomSide) && (
+        {(state.config.allowFlip || state.config.randomSide || state.config.hardMode) && (
           <Text style={[styles.sideLabel, state.cardSide === 'blue' ? styles.sideLabelBlue : styles.sideLabelYellow]}>
             {state.cardSide === 'blue' ? 'BLUE SIDE' : 'YELLOW SIDE'}
           </Text>
