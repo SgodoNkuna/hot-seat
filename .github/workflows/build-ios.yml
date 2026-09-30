@@ -1,0 +1,67 @@
+name: Build iOS (simulator check)
+
+# Builds the iPhone app and launches it in the iOS simulator to prove it opens.
+# The simulator build can't be installed on real iPhones: that needs an Apple
+# Developer account for signing (see DEPLOY.md). iPhone players can use the
+# website's "Add to Home Screen" in the meantime.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ios
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-15
+    env:
+      EXPO_PUBLIC_SERVER_URL: ${{ vars.SERVER_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx expo prebuild --platform ios
+
+      - name: Build for the simulator
+        working-directory: ios
+        run: |
+          WS=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WS%.xcworkspace}"
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
+            -sdk iphonesimulator -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            -quiet build
+
+      - name: Launch in the simulator
+        run: |
+          mkdir -p smoke
+          APP=$(ls -d ios/build/Build/Products/Release-iphonesimulator/*.app | head -1)
+          DEVICE=$(xcrun simctl list devices available -j | node -e "
+            const d=JSON.parse(require('fs').readFileSync(0)).devices;
+            const all=Object.entries(d).filter(([k])=>k.includes('iOS')).flatMap(([,v])=>v);
+            const p=all.find(x=>/^iPhone/.test(x.name));
+            console.log(p.udid)")
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl install "$DEVICE" "$APP"
+          xcrun simctl launch "$DEVICE" com.sgodonkuna.hotseat
+          sleep 30
+          xcrun simctl io "$DEVICE" screenshot smoke/ios-launch.png
+          if xcrun simctl spawn "$DEVICE" launchctl list | grep -q com.sgodonkuna.hotseat; then
+            echo "App launched and is running"
+          else
+            echo "App is not running after launch"; exit 1
+          fi
+          (cd "$(dirname "$APP")" && zip -qr "$GITHUB_WORKSPACE/smoke/HotSeat-simulator.app.zip" "$(basename "$APP")")
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-smoke
+          path: smoke/

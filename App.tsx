@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
@@ -44,13 +44,19 @@ const linking = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     AlfaSlabOne_400Regular,
     Fraunces_400Regular,
     Fraunces_600SemiBold,
   });
+  // never hang on a blank screen: if fonts fail or stall, start with system fonts
+  const [gaveUp, setGaveUp] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setGaveUp(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded && !fontError && !gaveUp) {
     return <View style={{ flex: 1, backgroundColor: colors.ink }} />;
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { GameState } from './engine/types';
 
@@ -11,12 +11,14 @@ const FILES = {
 };
 type SoundName = keyof typeof FILES;
 
-const cache: Partial<Record<SoundName, Audio.Sound>> = {};
+// players are created on first use, so nothing audio-related runs while the app starts up
+const cache: Partial<Record<SoundName, AudioPlayer>> = {};
 
-async function play(name: SoundName) {
+function play(name: SoundName) {
   try {
-    if (!cache[name]) cache[name] = (await Audio.Sound.createAsync(FILES[name])).sound;
-    await cache[name]!.replayAsync();
+    const player = (cache[name] ??= createAudioPlayer(FILES[name]));
+    player.seekTo(0).catch(() => {});
+    player.play();
   } catch {
     // sound is best-effort (e.g. browser blocked autoplay)
   }
