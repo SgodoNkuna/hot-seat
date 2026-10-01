@@ -15,21 +15,18 @@ concurrency:
 
 jobs:
   ios:
-    runs-on: macos-15
+    runs-on: macos-26
     env:
       EXPO_PUBLIC_SERVER_URL: ${{ vars.SERVER_URL }}
     steps:
       - uses: actions/checkout@v4
 
-      # Needs Swift 6.2 (Xcode 26.x) but Xcode 26.3's stricter C++ interop rejects
-      # expo-modules-jsi, so take the newest Xcode 26.0–26.2 on the runner.
-      - name: Select Xcode 26.0-26.2
-        run: |
-          ls -d /Applications/Xcode_26* || true
-          XC=$(ls -d /Applications/Xcode_26.[0-2]*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XC" ]; then echo "No Xcode 26.0-26.2 on this runner"; exit 1; fi
-          sudo xcode-select -s "$XC/Contents/Developer"
-          xcodebuild -version
+      # expo-modules-jsi compiles from source and needs a recent Swift (constructor
+      # SWIFT_RETURNS_RETAINED); Xcode 26.2/26.3 on macos-15 reject it, so use the newest.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - run: ls -d /Applications/Xcode* && xcodebuild -version && swift --version
 
       - uses: actions/setup-node@v4
         with:
