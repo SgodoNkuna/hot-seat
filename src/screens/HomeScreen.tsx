@@ -14,7 +14,7 @@ export default function HomeScreen({ navigation }: Props) {
   const { top } = useSafeAreaInsets();
   return (
     <View style={styles.container}>
-      <View style={[styles.marquee, { height: 220 + top, paddingTop: top + 14 }]}>
+      <View style={[styles.marquee, { paddingTop: top + 12 }]}>
         <View style={styles.bulbRow}>
           {BULBS.map((_, i) => (
             <View key={i} style={[styles.bulb, i % 2 === 0 && styles.bulbLit]} />
@@ -30,7 +30,7 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={styles.betaBadgeText}>BETA</Text>
           </View>
         </View>
-        <View style={[styles.bulbRow, { marginTop: 14 }]}>
+        <View style={styles.bulbRow}>
           {BULBS.map((_, i) => (
             <View key={i} style={[styles.bulb, i % 2 !== 0 && styles.bulbLit]} />
           ))}
@@ -72,11 +72,11 @@ const styles = StyleSheet.create({
   howTo: { marginTop: 14, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 12 },
   howToText: { color: colors.red, fontFamily: fonts.bodySemiBold, fontSize: 15, textDecorationLine: 'underline' },
   container: { flex: 1, backgroundColor: colors.cream },
+  // sized by its content (both bulb rows + card) so nothing spills under the notch or into the page
   marquee: {
-    gap: 12,
+    paddingBottom: 12,
     backgroundColor: colors.red,
     alignItems: 'center',
-    justifyContent: 'flex-start',
   },
   bulbRow: { flexDirection: 'row', gap: 10 },
   bulb: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.redDark },
@@ -85,11 +85,11 @@ const styles = StyleSheet.create({
     width: 300,
     backgroundColor: colors.cream,
     borderRadius: 16,
-    paddingVertical: 20,
+    paddingVertical: 16,
     alignItems: 'center',
     borderBottomWidth: 8,
     borderBottomColor: colors.ink,
-    marginVertical: 14,
+    marginVertical: 10,
   },
   logoBadge: {
     width: 48,
