@@ -3,15 +3,18 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { colors, fonts } from '../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 const BULBS = new Array(9).fill(0);
 
 export default function HomeScreen({ navigation }: Props) {
+  // keep the marquee below the phone status bar / notch
+  const { top } = useSafeAreaInsets();
   return (
     <View style={styles.container}>
-      <View style={styles.marquee}>
+      <View style={[styles.marquee, { height: 220 + top, paddingTop: top }]}>
         <View style={styles.bulbRow}>
           {BULBS.map((_, i) => (
             <View key={i} style={[styles.bulb, i % 2 === 0 && styles.bulbLit]} />
