@@ -14,7 +14,7 @@ export default function HomeScreen({ navigation }: Props) {
   const { top } = useSafeAreaInsets();
   return (
     <View style={styles.container}>
-      <View style={[styles.marquee, { height: 220 + top, paddingTop: top }]}>
+      <View style={[styles.marquee, { height: 220 + top, paddingTop: top + 14 }]}>
         <View style={styles.bulbRow}>
           {BULBS.map((_, i) => (
             <View key={i} style={[styles.bulb, i % 2 === 0 && styles.bulbLit]} />
@@ -73,10 +73,10 @@ const styles = StyleSheet.create({
   howToText: { color: colors.red, fontFamily: fonts.bodySemiBold, fontSize: 15, textDecorationLine: 'underline' },
   container: { flex: 1, backgroundColor: colors.cream },
   marquee: {
-    height: 220,
+    gap: 12,
     backgroundColor: colors.red,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   bulbRow: { flexDirection: 'row', gap: 10 },
   bulb: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.redDark },
